@@ -21,8 +21,8 @@ impl DrawMethod for LinesMethod {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
         
-        for i in (0..parameters.num_lines) {
-            for x in (0..=100) {
+        for i in 0..parameters.num_lines {
+            for x in 0..=100 {
                 if i % 2 == 0 {
                     let x = (physical_dimensions.page_width() / 100.) * x as f64;
                     surface.sample_xy(x, i as f64 * 10.);
@@ -34,7 +34,7 @@ impl DrawMethod for LinesMethod {
 
             let (current_x, current_y) = surface.get_xy();
             println!("Current xy {} {}", current_x, current_y);
-            for y in (0..10) {
+            for y in 0..10 {
                 surface.sample_xy(current_x, current_y + y as f64);
             }
         }
@@ -49,7 +49,7 @@ impl DrawMethod for LinesMethod {
 
 #[derive(Serialize, Deserialize)]
 pub struct LinesParameters {
-    pub num_lines: u32
+    pub num_lines: u32,
 }
 
 impl DrawParameters for LinesParameters {}
