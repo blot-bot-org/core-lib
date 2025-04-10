@@ -24,22 +24,19 @@ impl DrawMethod for LinesMethod {
         for i in 0..parameters.num_lines {
             for x in 0..=100 {
                 if i % 2 == 0 {
-                    let x = (physical_dimensions.page_width() / 100.) * x as f64;
+                    let x = ((physical_dimensions.page_width() - (2. * parameters.horizontal_margin as f64)) / 100.) * x as f64 + parameters.horizontal_margin as f64;
                     surface.sample_xy(x, i as f64 * 10.);
                 } else {
-                    let x = physical_dimensions.page_width() - (physical_dimensions.page_width() / 100.) * x as f64;
+                    let x = physical_dimensions.page_width() - parameters.horizontal_margin as f64 - ((physical_dimensions.page_width() - (2. * parameters.horizontal_margin as f64)) / 100.) * x as f64;
                     surface.sample_xy(x, i as f64 * 10.);
                 }
             }
 
             let (current_x, current_y) = surface.get_xy();
-            println!("Current xy {} {}", current_x, current_y);
             for y in 0..10 {
                 surface.sample_xy(current_x, current_y + y as f64);
             }
         }
-
-        println!("Drawing {} lines", parameters.num_lines);
 
         surface.current_ins
     }
@@ -50,6 +47,7 @@ impl DrawMethod for LinesMethod {
 #[derive(Serialize, Deserialize)]
 pub struct LinesParameters {
     pub num_lines: u32,
+    pub horizontal_margin: u32,
 }
 
 impl DrawParameters for LinesParameters {}
