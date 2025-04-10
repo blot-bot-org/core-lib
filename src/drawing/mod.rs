@@ -1,3 +1,6 @@
+//!
+//! Drawing method trait, helpers and implementations
+//!
 
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use crate::hardware::PhysicalDimensions;

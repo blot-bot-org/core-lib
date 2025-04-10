@@ -1,3 +1,6 @@
+//!
+//! Image-based preview generation and related components
+//! 
 
 use crate::hardware::PhysicalDimensions;
 use crate::instruction::InstructionSet;

@@ -1,5 +1,5 @@
 //!
-//! Handling of opcode instructions sent to the drawing machine
+//! Opcode instructions representations and handlers
 //! 
 
 pub mod error;
