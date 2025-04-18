@@ -91,8 +91,9 @@ impl InstructionSet {
             // calculate the maximum end size of the next buffer
             let mut end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1);
             
-            // trim the buffer down to a full instruction
-            while *self.binary.get(end_idx).unwrap() != 0x0C && end_idx > 0 {
+            // trim the buffer down to a full instruction. must be a multiple of 5 for now, must
+            // change when additional instruction bytes are available!
+            while *self.binary.get(end_idx).unwrap() != 0x0C && end_idx > 0 || (end_idx - start_idx + 1) % 5 != 0 {
                 end_idx -= 1;
             }
 
@@ -140,6 +141,10 @@ impl InstructionSet {
 
                 numerical_instructions.push((left_steps, right_steps));
             }
+        }
+        
+        for (a, b) in numerical_instructions.iter() {
+            // print!("{},{},", a, b);
         }
 
         Ok(numerical_instructions)

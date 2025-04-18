@@ -9,6 +9,7 @@ use crate::preview::belts::Belts;
 use crate::hardware::math::*;
 
 pub mod lines;
+pub mod cascade;
 
 ///
 /// The trait for all drawing methods to implement.
@@ -96,10 +97,11 @@ impl<'pd> DrawSurface<'pd> {
             panic!("Steps are outside range!");
             // TODO: Error impl
         }
-
-        let ls: i16 = (delta_left_steps as i16).try_into().unwrap();
-        let rs: i16 = (delta_right_steps as i16).try_into().unwrap();
+        
+        let ls: i16 = (delta_left_steps.round() as i16).try_into().unwrap();
+        let rs: i16 = (delta_right_steps.round() as i16).try_into().unwrap();
         self.belts.move_by_steps(ls, -rs); // adjust state of belts, we have to invert the already inverted r
+        // print!("{},{},", ls, rs);
     
         // prepare bytes for socket
         let mut left_step_bytes: [u8; 2] = [0_u8; 2];
