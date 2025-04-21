@@ -12,7 +12,7 @@ The library provides many utilities for working with Blot Bot.<br>To name a few:
 - heavy abstractions for controlling the pen
 - a socket client to interact with the blot bot firmware
 <br>
-<br>
+
 This project is currently [unlicensed](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository#choosing-the-right-license).
 
 
