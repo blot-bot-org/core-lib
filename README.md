@@ -2,7 +2,7 @@
 This is the repository containing the core library of the Blot Bot drawing machine (aka `bbcore`)
 <br>
 <br>
-It provides a direct interface to drawing with the custom Blot Bot firmware, and so can be tacked on-to any frontend, such as a website, desktop app or CLI. I am actively using this library to produce a desktop app for the Blot Bot.
+It provides a direct interface to drawing with the custom Blot Bot firmware, and so can be tacked on-to any frontend, such as a website, desktop app or CLI. I am actively using this library to produce a desktop app for Blot Bot.
 <br>
 <br>
 The library provides many utilities for working with Blot Bot.<br>To name a few:
