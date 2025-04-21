@@ -8,8 +8,11 @@ use serde::{Serialize, Deserialize};
 use crate::preview::belts::Belts;
 use crate::hardware::math::*;
 
+pub mod util;
+
 pub mod lines;
 pub mod cascade;
+pub mod scribble;
 
 ///
 /// The trait for all drawing methods to implement.
@@ -94,7 +97,7 @@ impl<'pd> DrawSurface<'pd> {
         let delta_right_steps = -(delta_right_length * steps_per_mm());
 
         if delta_left_steps >= i16::MAX as f64 || delta_left_steps <= i16::MIN as f64 || delta_right_steps >= i16::MAX as f64 || delta_right_steps <= i16::MIN as f64 {
-            panic!("Steps are outside range!");
+            panic!("Steps are outside range! Currently have {} instructions generated, with step sizes l:{} and r:{}", self.current_ins.len(), delta_left_steps, delta_right_steps);
             // TODO: Error impl
         }
         
