@@ -30,6 +30,8 @@ impl DrawMethod for LinesMethod {
 
     ///
     /// Generates instructions to perform the lines drawing method.
+    /// This drawing method creates a set of lines which move down the page. It is used for
+    /// testing, only.
     ///
     /// # Parameters:
     /// - `physical_dimensions`: A physical dimension object, including paper width / height
