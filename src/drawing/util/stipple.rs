@@ -4,10 +4,26 @@ use rand::Rng;
 use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 
-pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Vec<Point> {
-    
-    let input_image = ImageReader::open(file_path).unwrap().decode().unwrap().into_rgb8();
 
+/// 
+/// Main function to stipple points. This function plots the initial points,
+/// weighted towards darker areas of the image, and then calls n iterations of Lloyd's relaxation.
+/// 
+///
+/// # Parameters:
+/// - `file_path`: The path of the input image file
+/// - `num_points`: The number of points to stipple
+/// - `iterations`: The number of iterations of Lloyd's relaxation to perform
+///
+/// # Returns
+/// - A vector containing the positions of the stippled points
+///
+pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Vec<Point> {
+
+    // open input image
+    let input_image = ImageReader::open(file_path).unwrap().decode().unwrap().into_rgb8();
+    
+    // create list of points, place them randomly at darker areas of image
     let mut points: Vec<Point> = Vec::with_capacity(num_points);
     let mut points_placed = 0;
     let mut rng = rand::rng();
@@ -24,6 +40,7 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
     }
     println!("Finished point generation!");
 
+    // iterate the lloyd's relaxation n times
     for _ in 0..iterations {
         iterate(&mut points, &input_image, relaxation_tendency);
     }
@@ -34,13 +51,28 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
 }
 
 
-
+///
+/// Performs an iteration of relaxation on a list of points, changing the points in place.
+/// The function calls a delaunay triangulation, creates the voronoi diagram, and then implements
+/// the Lloyd's relaxation algorithm.
+///
+/// # Parameters:
+/// - `points`: A mutable list of input points
+/// - `input_image`: The loaded input image
+/// - `relaxation_tendency`: A scalar float representing the tendency / strength of the cell relaxation
+///
 fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Vec<u8>>, relaxation_tendency: f32) {
 
+    // computes the delaunay triangulation
     let (triangles, new_points) = bowyer_watson(points);
     let edge_triangles: HashMap<(usize, usize), (usize, usize)> = get_edge_triangles(&triangles);
-    let (voronoi_sites, voronoi_edges, site_vertices) = get_extended_voronoi(&new_points, &triangles, &edge_triangles);
+    
+    // computes the voronoi diagram
+    // voronoi_sites, voronoi_edges, site_vertices
+    let (voronoi_sites, _, site_vertices) = get_extended_voronoi(&new_points, &triangles, &edge_triangles);
 
+    // performs the weghted lloyd's stippling, tending cell sites towards the cell centroids given
+    // a scalar `relaxation_tendency`
     for (index, (&site, neighbours)) in site_vertices.iter().enumerate() {
             let mut sum_weighted_x = 0.;
             let mut sum_weighted_y = 0.;
@@ -61,7 +93,6 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
             let centroid_x = sum_weighted_x / total_weight;
             let centroid_y = sum_weighted_y / total_weight;
 
-
             let lerp_x = new_points[site].x + (centroid_x - *new_points[site].x) * relaxation_tendency;
             let lerp_y = new_points[site].y + (centroid_y - *new_points[site].y) * relaxation_tendency;
 
@@ -70,7 +101,17 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
 }
 
 
-
+///
+/// Performs the nearest neighbour pathfinding algorithm on a given set of points.
+/// I use nearest neighbour only to create a path for the pen to follow - hence a bad,
+/// heuristic pathfinding algorithm is not the end of the world.
+///
+/// # Parameters:
+/// - `points`: A list of points to perform the pathfinding algorithm on
+///
+/// # Returns:
+/// - A new vector, the tour, representing the indices of the points in order
+///
 pub fn nearest_neighbour_tour(points: &Vec<Point>) -> Vec<usize> {
     let mut visited = vec![false; points.len()];
     
@@ -80,11 +121,12 @@ pub fn nearest_neighbour_tour(points: &Vec<Point>) -> Vec<usize> {
     tour.push(current_idx);
     visited[current_idx] = true;
 
-    for pidx in 1..points.len() {
+    // repeatedly find the next closest point, and add it to the tour
+    for _ in 1..points.len() {
         let mut nearest = None;
         let mut nearest_distance = f32::INFINITY;
 
-        for (k, point) in points.iter().enumerate() {
+        for k in 0..points.len() {
             if !visited[k] {
                 let dist = points[current_idx].calc_shortest_dist(&points[k]);
                 if dist < nearest_distance {
@@ -105,7 +147,18 @@ pub fn nearest_neighbour_tour(points: &Vec<Point>) -> Vec<usize> {
 }
 
 
-
+/// 
+/// Computes the delaunay triangulation, given a set of points.
+/// This function is an implementation of the Bowyer-Watson algorithm.
+/// Pseudocode reference: https://en.wikipedia.org/wiki/Bowyer%E2%80%93Watson_algorithm#Pseudocode
+///
+/// # Parameters:
+/// - `points`: The list of points of which to compute the delaunay triangulation
+///
+/// # Returns:
+/// - A new vector of arrays, where each array of 3 indices points to the 3 vertices of a triangle
+/// - A list of points with the super-triangle vertices
+///
 fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
 
     // single copy to vec occurs here
@@ -133,6 +186,7 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
         }
 
         let mut bad_edges: Vec<(usize, usize)> = vec![];
+        // add the edge tuples to the vector, whilst normalising to make edge a <-> b == b <-> a
         for indice_index in bad_triangles.iter() {
             let val = &triangle_indices[*indice_index];
 
@@ -153,11 +207,9 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
             } else {
                 bad_edges.push((val[0], val[2]));
             }
-
-            // add the edge tuples to the vector, whilst normalising to make edge a <-> b == b <-> a
         }
 
-        // flamegraph tests show hashmap allocation is using moderate execution expense
+        // nb: flamegraph tests show hashmap allocation is using moderate execution expense
         let mut edge_count = HashMap::new();
         for &(a, b) in bad_edges.iter() {
             *edge_count.entry((a, b)).or_insert(0) += 1;
@@ -187,10 +239,23 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
     (triangle_indices, all_points)
 }
 
-// calculates the triangles touching a specific edge
-// the key of the return is the edge, normalised
-// the value of the return is up to two triangles indices, or 1 index, never 0
+
+/// 
+/// Computes the triangles which are part of a specific edge.
+///
+/// A map is created, where the keys are normalised tuples of the edge, and the values are either
+/// one or two triangles which share that edge.
+/// If an edge only has one triangle, it's value will look like (triangle_indice, usize::MAX).
+/// This means the triangle is on the convex hull of the delaunay triangulation.
+///
+/// # Parameters:
+/// - `triangles`: A vector of arrays of triangle indices
+///
+/// # Returns:
+/// - A HashMap of edges <-> triangles as described above
+///
 fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> HashMap<(usize, usize), (usize, usize)> {
+    // theoretically, if there are 18446744073709551615 or more points, we have a problem.
     if triangles.len() >= usize::MAX {
         panic!("Why are there so many points?? Cannot default hashmap to infinity");
     }
@@ -215,7 +280,27 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> HashMap<(usize, usize), (u
 }
 
 
-// returns site points, with edges between represented as indice tuples, with extended hull rays
+/// 
+/// Computes the voronoi diagram. Specifically, this function:
+///     1. Computes a partial voronoi diagram.
+///     2. Extends edge rays, away from the centroid of the delaunay triangulation.
+///     3. Clips the voronoi cells to a bounding box, to complete the voronoi diagram.
+///     4. Amidst this, lazily computes the corresponding voronoi sites to their voronoi cells.
+/// An initial Google search told me I just had to do step 1. Well constructing a voronoi diagram isn't as easy
+/// as Google makes it seem. Worse, Google has basically no information on steps 2, 3 and 4, so I
+/// had to figure it out for myself. I hated every second of writing this function.
+///
+/// # Parameters:
+/// - `points`: A list of points which form the vertices of the delaunay triangulation
+/// - `triangles`: A list of triangle arrays, which are 3 indices representing point indices
+/// - `edge_triangles`: A HashMap to lookup which edge makes which triangle(s)
+///
+/// # Returns:
+/// - A vector of the voronoi diagram's indices
+/// - A vector containing two indices of the point vector, which form the edges of the voronoi diagram
+/// - A HashMap of a site, with a key as an index of the point vector, and a list of
+///   corresponding indices of the point vector, which form the polygon of the voronoi cell
+///
 fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_triangles: &HashMap<(usize, usize), (usize, usize)>) -> (Vec<Point>, Vec<(usize, usize)>, HashMap<usize, Vec<usize>>) {
     // vector, the index of the site point corresponds to the index of the triangle in `triangles`
     let mut voronoi_sites: Vec<Point> = Vec::with_capacity(triangles.len());
@@ -394,7 +479,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         // now we can quickly update the voronoi sites to have the correct vertex pointers
         // -> `voronoi_edges[index].1` contains the pointer to the illegal vertex
         // so loop through each site, if any reference to old vertices, update it
-        for (site_index, vertices) in site_vertices.iter_mut() {
+        for (_, vertices) in site_vertices.iter_mut() {
             if voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() < 0. {
                 if let Some(idx) = vertices.iter().position(|&p0| p0 == voronoi_edges[edge_index].0) {
                     let _ = vertices.remove(idx);
@@ -429,39 +514,6 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
     }
     voronoi_edges.push((last_point_idx.expect("There should have been a last point index, unless no diagram was even created"), first_index));
     
-    
-    // adjacancy map of voronoi point <-> list of other voronoi point via edges
-    let mut vertex_adjacancy: HashMap<usize, Vec<usize>> = HashMap::new();
-    for (index, (p1, p2)) in voronoi_edges.iter().enumerate() {
-        if dead_site_points.contains(&index) { continue; } // ignore site points with no edges
-        
-        vertex_adjacancy.entry(*p1).or_insert(Vec::new()).push(*p2);
-        vertex_adjacancy.entry(*p2).or_insert(Vec::new()).push(*p1);
-    }
-    
-    // adjacancy map of voronoi site <-> list of ither voronoi sites adjacant
-    let mut site_adjacancy: HashMap<usize, Vec<usize>> = HashMap::new();
-    for ((p0, p1), (_, _)) in edge_triangles {
-        site_adjacancy.entry(*p0).or_insert(Vec::new());
-        site_adjacancy.entry(*p1).or_insert(Vec::new());
-
-        if !site_adjacancy.get_mut(p0).unwrap().contains(p1) {
-            site_adjacancy.get_mut(p0).unwrap().push(*p1);
-        }
-
-        if !site_adjacancy.get_mut(p1).unwrap().contains(p0) {
-            site_adjacancy.get_mut(p1).unwrap().push(*p0);
-        }
-    }
-    
-    for (site, neighbours) in site_adjacancy.iter_mut() {
-        neighbours.sort_by(|a, b| {
-            let angle_a = (points[*a].y - points[*site].y).atan2(*(points[*a].x - points[*site].x));
-            let angle_b = (points[*b].y - points[*site].y).atan2(*(points[*b].x - points[*site].x));
-            angle_a.partial_cmp(&angle_b).unwrap()
-        });
-    }
-
     // DEBUG
     /*
     for (site, neighbours) in &site_vertices {
@@ -479,7 +531,16 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
 }
 
 
-
+/// 
+/// Computes the size of the initial super triangle for the delaunay triangulation.
+/// The super triangle must enclose all given points.
+///
+/// # Parameters:
+/// - `points`: The points of which to create the super triangle on
+///
+/// # Returns:
+/// - An array of 3 points which form the super triangle
+///
 fn get_super_triangle(points: &[Point]) -> [Point; 3] {
     let max_x = points.iter().max_by_key(|p| p.x).unwrap().x * 2.;
     let max_y = points.iter().max_by_key(|p| p.y).unwrap().y * 2.;
