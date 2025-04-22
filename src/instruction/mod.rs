@@ -143,10 +143,6 @@ impl InstructionSet {
             }
         }
         
-        for (a, b) in numerical_instructions.iter() {
-            // print!("{},{},", a, b);
-        }
-
         Ok(numerical_instructions)
     }
 }

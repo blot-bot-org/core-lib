@@ -68,8 +68,7 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
     let edge_triangles: HashMap<(usize, usize), (usize, usize)> = get_edge_triangles(&triangles);
     
     // computes the voronoi diagram
-    // voronoi_sites, voronoi_edges, site_vertices
-    let (voronoi_sites, _, site_vertices) = get_extended_voronoi(&new_points, &triangles, &edge_triangles);
+    let (voronoi_sites, _voronoi_edges, site_vertices) = get_extended_voronoi(&new_points, &triangles, &edge_triangles);
 
     // performs the weghted lloyd's stippling, tending cell sites towards the cell centroids given
     // a scalar `relaxation_tendency`
@@ -479,7 +478,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         // now we can quickly update the voronoi sites to have the correct vertex pointers
         // -> `voronoi_edges[index].1` contains the pointer to the illegal vertex
         // so loop through each site, if any reference to old vertices, update it
-        for (_, vertices) in site_vertices.iter_mut() {
+        for (_site_index, vertices) in site_vertices.iter_mut() {
             if voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() < 0. {
                 if let Some(idx) = vertices.iter().position(|&p0| p0 == voronoi_edges[edge_index].0) {
                     let _ = vertices.remove(idx);
