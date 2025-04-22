@@ -4,19 +4,40 @@ use crate::hardware::PhysicalDimensions;
 use serde::{Serialize, Deserialize};
 use crate::drawing::DrawSurface;
 
+///
+/// An empty struct to implement the "Lines" draw method on.
+///
 pub struct LinesMethod;
 
 impl DrawMethod for LinesMethod {
     type DrawParameters = LinesParameters;
-
+    
+    ///
+    /// # Returns:
+    /// - The backend ID of the drawing method
+    ///
     fn get_id(&self) -> &'static str {
         "lines"
     }
 
+    ///
+    /// # Returns:
+    /// - The frontend display name of the drawing method
+    ///
     fn get_formatted_name(&self) -> &'static str {
         "Lines"
     }
 
+    ///
+    /// Generates instructions to perform the lines drawing method.
+    ///
+    /// # Parameters:
+    /// - `physical_dimensions`: A physical dimension object, including paper width / height
+    /// - `parameters`: The user-configured parameters to adjust the drawing style
+    ///
+    /// # Returns:
+    /// - An instruction set, represented as a u8 vector, containing the draw calls
+    ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Vec<u8> {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
@@ -43,7 +64,13 @@ impl DrawMethod for LinesMethod {
 }
 
 
-
+///
+/// A set of parameters to instruct the generation of the draw calls.
+///
+/// # Fields:
+/// - `num_lines`: The number of vertical lines to draw
+/// - `horizontal_margin`: The horizontal margin of the drawing, in millimetres
+///
 #[derive(Serialize, Deserialize)]
 pub struct LinesParameters {
     pub num_lines: u32,
