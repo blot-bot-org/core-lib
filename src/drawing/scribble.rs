@@ -50,14 +50,16 @@ impl DrawMethod for ScribbleMethod {
         let tour = stipple::nearest_neighbour_tour(&stippled_points);
         println!("Finished tour generation!");
 
+        let radius_divisor = ((100 - (parameters.scribble_size)) as f32 / 100.) * 5.;
+
         for t in tour.windows(2) {
             let scaled_x = stippled_points[t[0]].x / 5.;
             let scaled_y = stippled_points[t[0]].y / 5.;
             
             let dist_to_next = ((stippled_points[t[1]].x / 5. - stippled_points[t[0]].x / 5.).powi(2) + (stippled_points[t[1]].y / 5. - stippled_points[t[0]].y / 5.).powi(2)).sqrt();
 
-            let radius = dist_to_next / 5.;
-            for i in 0..10 {
+            let radius = dist_to_next / radius_divisor;
+            for i in 0..(parameters.scribble_size / 2) {
                 let offset_x = f32::sin((i as f32 * (std::f32::consts::PI)) / 10.) * radius;
                 let offset_y = f32::cos((i as f32 * (std::f32::consts::PI)) / 10.) * radius;
 
@@ -82,7 +84,8 @@ impl DrawMethod for ScribbleMethod {
 pub struct ScribbleParameters {
     num_stipples: usize,
     num_iterations: usize,
-    relaxation_tendency: f32
+    relaxation_tendency: f32,
+    scribble_size: usize
 }
 
 impl DrawParameters for ScribbleParameters {}
