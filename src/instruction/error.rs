@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+///
 /// All errors emitted from the instruction module.
 ///
 /// - `StartOutOfBounds`: When a buffer is initialised with a start index outside the length of the vector
@@ -21,6 +22,7 @@ use thiserror::Error;
 /// - `BufferTooSmall`: When the requested instruction buffer size for the instruction stream is too small
 ///     Parameters:
 ///     - `usize`: The requested buffer size
+///
 #[derive(Error, Debug)]
 pub enum InstructionError {
     #[error("Invalid start index: {start_idx}, expected between 0 and {}", .upper_bound)]

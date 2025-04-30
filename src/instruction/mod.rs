@@ -145,6 +145,14 @@ impl InstructionSet {
         
         Ok(numerical_instructions)
     }
+
+    ///
+    /// # Returns:
+    /// - The binary instructions, as a vector of bytes
+    ///
+    pub fn get_binary(&self) -> &Vec<u8> {
+        &self.binary
+    }
 }
 
 
