@@ -1,10 +1,13 @@
 use std::io::prelude::*;
+use std::ops::DerefMut;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::sync::Mutex;
 use tokio::net::TcpStream;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
 use std::sync::Arc;
+
+use crate::instruction::InstructionSet;
 
 use super::error::ClientError;
 
@@ -34,8 +37,8 @@ impl ClientState {
         let mut safe_socket = socket.unwrap();
 
         // send greeting byte and read response
-        let _ = safe_socket.write(&[0x00, 0x01]).await;
-        let mut inc_buffer = [0; 64];
+        let _ = safe_socket.write_all(&[0x00, 0x01]).await;
+        let mut inc_buffer = [0; 256];
         if let Err(_) = safe_socket.read(&mut inc_buffer).await {
             return Err(ClientError::GreetingTimedOut);
         };
@@ -44,8 +47,9 @@ impl ClientState {
             // machine is okay to get started with drawing. so initialise machine config, and
             // return the client state instance so the implementation (frontend, cli) can takeover
             let (protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width) = read_header(&inc_buffer);
+            // can init to machine_configuration if needed
 
-            println!("{} {} {} {}", protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width);
+            println!("machinedrawing ready to draw...\nmachine_protocol:{}\nmax_buffer_size:{}\nmax_motor_speed:{}\nmin_pulse_width:{}", protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width);
         } else if *inc_buffer.get(0).unwrap() == 0x00 {
             // machine is NOT okay to get started. protocol should parse this here
             return Err(ClientError::MachineInUse);
@@ -58,36 +62,65 @@ impl ClientState {
 
 
     // specific client implementation can be handled here
-    pub async fn pause(writer: &mut OwnedWriteHalf) {
-        let _ = writer.write(&[0x04, 0x01]).await;
+    pub async fn pause(writer: &mut OwnedWriteHalf, should_pause: bool) {
+        let flag_byte: u8 = match should_pause {
+            true => 0x01,
+            _ => 0x00
+        };
+
+        // 0x01 = pause, 0x00 = resume
+        let _ = writer.write_all(&[0x04, flag_byte]).await;
     } 
 
 
-    pub async fn listen(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>) {
-        println!("starting listen");
+    pub async fn listen(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>, buf_idx: &Arc<Mutex<usize>>, ins_set: &InstructionSet) {
+        // println!("starting listen loop");
     
         loop {
             let mut incoming_buf: [u8; 255] = [0; 255];
-            println!("AWAITING BYTES.");
-            let _ = reader.read(&mut incoming_buf).await;
+            let _ = reader.read(&mut incoming_buf).await; // will block
 
-
+            /*
             println!("Received something...");
-            for b in incoming_buf.iter() {
-                print!("0x{:02x} ", b);
+            for b in 0..32 {
+                print!("0x{:02x} ", incoming_buf[b]);
             }
             println!();
-
-
+            */
 
             if *incoming_buf.get(0).unwrap() == 0x03 {
-                println!("Sending more instructions.");
+                let mut next_buf_lock = buf_idx.lock().await;
+                *next_buf_lock += 1;
 
-                let bytes = "\x01\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes();
+                let bounds = ins_set.get_buffer_bounds(4096).unwrap();
+
+                if *next_buf_lock - 1 == bounds.len() {
+
+                    let mut write_lock = write_ref.lock().await;
+                    let writer = write_lock.as_mut().unwrap();
+                    let _ = writer.write_all(&[0x02]).await;
+                    
+                    // reader gets shutdown when write does im pretty sure
+                    let _ = writer.shutdown().await;
+
+                    drop(write_lock);
+                    drop(next_buf_lock);
+
+                    // println!("Drawing has finished. Stopped listen loop.");
+                    return;
+                }
+                
+                // this is a little console progress update
+                println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
+
+
+                let (lb, ub) = bounds.get(*next_buf_lock - 1).unwrap();
+                drop(next_buf_lock);
 
                 let mut write_lock = write_ref.lock().await;
                 let writer = write_lock.as_mut().unwrap();
-                let _ = writer.write(&bytes).await;
+                let _ = writer.write_all(&[0x01]).await;
+                let _ = writer.write_all(&ins_set.get_binary()[*lb..=*ub]).await;
                 drop(write_lock);
             }
         }
@@ -142,7 +175,7 @@ fn bytes_to_u32(array: &[u8], index: usize) -> u32 {
 }
 
 // these functions should be extracted to protocol handlers
-fn read_header(header: &[u8; 64]) -> (u16, u32, u32, u32) {
+fn read_header(header: &[u8; 256]) -> (u16, u32, u32, u32) {
     // ignore first byte.
     
     (
