@@ -62,7 +62,9 @@ impl ClientState {
 
 
     // specific client implementation can be handled here
-    pub async fn pause(writer: &mut OwnedWriteHalf, should_pause: bool) {
+    pub async fn pause<F>(writer: &mut OwnedWriteHalf, should_pause: bool, mut emit: F)
+    where
+        F: FnMut(String) + Send + 'static {
         let flag_byte: u8 = match should_pause {
             true => 0x01,
             _ => 0x00
@@ -70,10 +72,15 @@ impl ClientState {
 
         // 0x01 = pause, 0x00 = resume
         let _ = writer.write_all(&[0x04, flag_byte]).await;
+
+        emit(r#"{"event":"drawing", "message":"The drawing was "#.to_owned() + (if flag_byte == 0x01 { "paused" } else { "resumed" }) + r#""}"#);
     } 
 
 
-    pub async fn listen(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>, buf_idx: &Arc<Mutex<usize>>, ins_set: &InstructionSet) {
+    pub async fn listen<F>(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>, buf_idx: &Arc<Mutex<usize>>, ins_set: &InstructionSet, mut emit: F)
+    where
+        F: FnMut(String) + Send + 'static,
+    {
         // println!("starting listen loop");
     
         loop {
@@ -111,7 +118,8 @@ impl ClientState {
                 }
                 
                 // this is a little console progress update
-                println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
+                // println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
+                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions"#.to_owned() + (format!("{}/{}", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len())).as_str() + r#"}"#);
 
 
                 let (lb, ub) = bounds.get(*next_buf_lock - 1).unwrap();
