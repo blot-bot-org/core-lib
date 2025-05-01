@@ -99,7 +99,7 @@ impl ClientState {
                 let mut next_buf_lock = buf_idx.lock().await;
                 *next_buf_lock += 1;
 
-                let bounds = ins_set.get_buffer_bounds(4096).unwrap();
+                let bounds = ins_set.get_buffer_bounds(32768).unwrap();
 
                 if *next_buf_lock - 1 == bounds.len() {
 
@@ -119,7 +119,7 @@ impl ClientState {
                 
                 // this is a little console progress update
                 // println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
-                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions"#.to_owned() + (format!("{}/{}", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len())).as_str() + r#"}"#);
+                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions ("#.to_owned() + (format!("{}/{}", *next_buf_lock, ins_set.get_buffer_bounds(32768).unwrap().len())).as_str() + r#")"}"#);
 
 
                 let (lb, ub) = bounds.get(*next_buf_lock - 1).unwrap();
