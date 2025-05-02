@@ -43,13 +43,16 @@ impl DrawMethod for ScribbleMethod {
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Vec<u8> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<Vec<u8>, String> {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
         
-        let stippled_points: Vec<stipple_structures::Point> = stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, parameters.relaxation_tendency);
+        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, parameters.relaxation_tendency) {
+            Ok(val) => val,
+            Err(err_str) => return Err(err_str),
+        };
+
         let tour = stipple::nearest_neighbour_tour(&stippled_points);
-        println!("Finished tour generation!");
 
         let radius_divisor = ((100 - (parameters.scribble_size)) as f32 / 100.) * 5.;
 
@@ -68,11 +71,13 @@ impl DrawMethod for ScribbleMethod {
                 // let lerped = lerp_xy(scaled_x + offset_x, stippled_points[t[1]].x / 5., scaled_y + offset_y, stippled_points[t[1]].y / 5., (i as f32 / iterations as f32));
 
                 // surface.sample_xy((scaled_x + offset_x + lerped.0).into_inner() as f64, (scaled_y + offset_y + lerped.1).into_inner() as f64);
-                 surface.sample_xy((scaled_x + offset_x).into_inner() as f64, (scaled_y + offset_y + parameters.vertical_offset).into_inner() as f64);
+                if let Err(err_str) = surface.sample_xy((scaled_x + offset_x).into_inner() as f64, (scaled_y + offset_y + parameters.vertical_offset).into_inner() as f64) {
+                    return Err(err_str);
+                };
             }
         }
 
-        surface.current_ins
+        Ok(surface.current_ins)
     }
 }
 

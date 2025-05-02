@@ -13,6 +13,8 @@ pub mod util;
 pub mod lines;
 pub mod cascade;
 pub mod scribble;
+// pub mod islands;
+pub mod dunes;
 
 ///
 /// The trait for all drawing methods to implement.
@@ -28,7 +30,7 @@ pub trait DrawMethod {
     fn get_id(&self) -> &'static str;
     fn get_formatted_name(&self) -> &'static str;
 
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, params: &Self::DrawParameters) -> Vec<u8>;
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, params: &Self::DrawParameters) -> Result<Vec<u8>, String>;
 }
 
 /// 
@@ -85,8 +87,12 @@ impl<'pd> DrawSurface<'pd> {
     /// # Parameters:
     /// - `x`: The new pen x position, relative to the top left of the paper in millimetres
     /// - `y`: The new pen y position, relative to the top left of the paper in millimetres
-    /// 
-    fn sample_xy(&mut self, x: f64, y: f64) {
+    ///
+    /// # Returns:
+    /// - Void if the function suceeded
+    /// - An error as an owned string, explaining the problem
+    //
+    fn sample_xy(&mut self, x: f64, y: f64) -> Result<(), String> {
         let (new_left, new_right) = cartesian_to_belt(*self.physical_dimensions.page_horizontal_offset() + x, *self.physical_dimensions.page_vertical_offset() + y, *self.physical_dimensions.motor_interspace());
 
         // delta length of belts in mm
@@ -97,7 +103,7 @@ impl<'pd> DrawSurface<'pd> {
         let delta_right_steps = -(delta_right_length * steps_per_mm());
 
         if delta_left_steps >= i16::MAX as f64 || delta_left_steps <= i16::MIN as f64 || delta_right_steps >= i16::MAX as f64 || delta_right_steps <= i16::MIN as f64 {
-            panic!("Steps are outside range! Currently have {} instructions generated, with step sizes l:{} and r:{}", self.current_ins.len(), delta_left_steps, delta_right_steps);
+            return Err(format!("Steps are outside range! Currently have {} instructions generated, with step sizes l:{} and r:{}", self.current_ins.len(), delta_left_steps, delta_right_steps).to_owned());
             // TODO: Error impl
         }
         
@@ -118,6 +124,8 @@ impl<'pd> DrawSurface<'pd> {
         self.current_ins.push(right_step_bytes[0]);    
         self.current_ins.push(right_step_bytes[1]);    
         self.current_ins.push(0x0C_u8);
+
+        Ok(())
     }
 
     /// 

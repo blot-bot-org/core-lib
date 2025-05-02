@@ -40,7 +40,7 @@ impl DrawMethod for LinesMethod {
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Vec<u8> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Result<Vec<u8>, String> {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
         
@@ -48,20 +48,26 @@ impl DrawMethod for LinesMethod {
             for x in 0..=100 {
                 if i % 2 == 0 {
                     let x = ((physical_dimensions.page_width() - (2. * parameters.horizontal_margin as f64)) / 100.) * x as f64 + parameters.horizontal_margin as f64;
-                    surface.sample_xy(x, i as f64 * 10.);
+                    if let Err(err_str) = surface.sample_xy(x, i as f64 * 10.) {
+                        return Err(err_str);
+                    };
                 } else {
                     let x = physical_dimensions.page_width() - parameters.horizontal_margin as f64 - ((physical_dimensions.page_width() - (2. * parameters.horizontal_margin as f64)) / 100.) * x as f64;
-                    surface.sample_xy(x, i as f64 * 10.);
+                    if let Err(err_str) = surface.sample_xy(x, i as f64 * 10.) {
+                        return Err(err_str);
+                    };
                 }
             }
 
             let (current_x, current_y) = surface.get_xy();
             for y in 0..10 {
-                surface.sample_xy(current_x, current_y + y as f64);
+                if let Err(err_str) = surface.sample_xy(current_x, current_y + y as f64) {
+                    return Err(err_str);
+                };
             }
         }
 
-        surface.current_ins
+        Ok(surface.current_ins)
     }
 }
 

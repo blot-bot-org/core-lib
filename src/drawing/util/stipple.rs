@@ -18,7 +18,7 @@ use std::collections::HashMap;
 /// # Returns
 /// - A vector containing the positions of the stippled points
 ///
-pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Vec<Point> {
+pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Result<Vec<Point>, String> {
 
     // open input image
     let input_image = ImageReader::open(file_path).unwrap().decode().unwrap().into_rgb8();
@@ -38,16 +38,15 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
             points_placed += 1;
         }
     }
-    println!("Finished point generation!");
 
     // iterate the lloyd's relaxation n times
     for _ in 0..iterations {
-        iterate(&mut points, &input_image, relaxation_tendency);
+        if let Err(err_str) = iterate(&mut points, &input_image, relaxation_tendency) {
+            return Err(err_str);
+        };
     }
 
-    println!("Finished iterations!");
-
-    points
+    Ok(points)
 }
 
 
@@ -61,42 +60,57 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
 /// - `input_image`: The loaded input image
 /// - `relaxation_tendency`: A scalar float representing the tendency / strength of the cell relaxation
 ///
-fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Vec<u8>>, relaxation_tendency: f32) {
+/// # Returns:
+/// - Void if an iteration suceeded
+/// - An error as an owned string, explaining the error
+///
+fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Vec<u8>>, relaxation_tendency: f32) -> Result<(), String> {
 
     // computes the delaunay triangulation
-    let (triangles, new_points) = bowyer_watson(points);
-    let edge_triangles: HashMap<(usize, usize), (usize, usize)> = get_edge_triangles(&triangles);
+    let (triangles, new_points) = match bowyer_watson(points) {
+        Ok((tri, n_p)) => (tri, n_p),
+        Err(err_str) => return Err(err_str),
+    };
+    let edge_triangles: HashMap<(usize, usize), (usize, usize)> = match get_edge_triangles(&triangles) {
+        Ok(val) => val,
+        Err(err_str) => return Err(err_str),
+    };
     
     // computes the voronoi diagram
-    let (voronoi_sites, _voronoi_edges, site_vertices) = get_extended_voronoi(&new_points, &triangles, &edge_triangles);
+    let (voronoi_sites, _voronoi_edges, site_vertices) = match get_extended_voronoi(&new_points, &triangles, &edge_triangles) {
+        Ok((vs, ve, sv)) => (vs, ve, sv),
+        Err(err_str) => return Err(err_str),
+    };
 
     // performs the weghted lloyd's stippling, tending cell sites towards the cell centroids given
     // a scalar `relaxation_tendency`
     for (index, (&site, neighbours)) in site_vertices.iter().enumerate() {
-            let mut sum_weighted_x = 0.;
-            let mut sum_weighted_y = 0.;
-            let mut total_weight = 0.;
+        let mut sum_weighted_x = 0.;
+        let mut sum_weighted_y = 0.;
+        let mut total_weight = 0.;
 
-            for n in neighbours.iter() {
-                let image_x = ((voronoi_sites[*n].x).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
-                let image_y = ((voronoi_sites[*n].y).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
+        for n in neighbours.iter() {
+            let image_x = ((voronoi_sites[*n].x).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
+            let image_y = ((voronoi_sites[*n].y).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
 
-                let pixel = input_image.get_pixel(image_x, image_y);
-                let weight = (255. - ((pixel.0[0] as f32 + pixel.0[1] as f32 + pixel.0[2] as f32) / 3.)) / 255.;
+            let pixel = input_image.get_pixel(image_x, image_y);
+            let weight = (255. - ((pixel.0[0] as f32 + pixel.0[1] as f32 + pixel.0[2] as f32) / 3.)) / 255.;
 
-                sum_weighted_x += *voronoi_sites[*n].x.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
-                sum_weighted_y += *voronoi_sites[*n].y.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
-                total_weight += weight;
-            }
-
-            let centroid_x = sum_weighted_x / total_weight;
-            let centroid_y = sum_weighted_y / total_weight;
-
-            let lerp_x = new_points[site].x + (centroid_x - *new_points[site].x) * relaxation_tendency;
-            let lerp_y = new_points[site].y + (centroid_y - *new_points[site].y) * relaxation_tendency;
-
-            points[index] = Point { x: lerp_x, y: lerp_y };
+            sum_weighted_x += *voronoi_sites[*n].x.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
+            sum_weighted_y += *voronoi_sites[*n].y.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
+            total_weight += weight;
         }
+
+        let centroid_x = sum_weighted_x / total_weight;
+        let centroid_y = sum_weighted_y / total_weight;
+
+        let lerp_x = new_points[site].x + (centroid_x - *new_points[site].x) * relaxation_tendency;
+        let lerp_y = new_points[site].y + (centroid_y - *new_points[site].y) * relaxation_tendency;
+
+        points[index] = Point { x: lerp_x, y: lerp_y };
+    }
+
+    Ok(())
 }
 
 
@@ -158,7 +172,7 @@ pub fn nearest_neighbour_tour(points: &Vec<Point>) -> Vec<usize> {
 /// - A new vector of arrays, where each array of 3 indices points to the 3 vertices of a triangle
 /// - A list of points with the super-triangle vertices
 ///
-fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
+fn bowyer_watson(points: &Vec<Point>) -> Result<(Vec<[usize; 3]>, Vec<Point>), String> {
 
     // single copy to vec occurs here
     let mut all_points = points.to_vec();
@@ -216,8 +230,12 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
 
         let mut polygon: Vec<(usize, usize)> = vec![];
         for edge in bad_edges.iter() {
-            if *edge_count.get(edge).expect("All edges should have 0 or entry") == 1 {
-                polygon.push(*edge);
+            if let Some(ec) = edge_count.get(edge) {
+                if *ec == 1 {
+                    polygon.push(*edge);
+                }
+            } else {
+                return Err("All delaunay edges should have HashMap entry.".to_owned());
             }
         }
 
@@ -235,7 +253,7 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
     // remove all triangles connected to super_triangle
     triangle_indices.retain(|tri| !(tri.contains(&super_triangle_index) || tri.contains(&(super_triangle_index + 1)) || tri.contains(&(super_triangle_index + 2))));
 
-    (triangle_indices, all_points)
+    Ok((triangle_indices, all_points))
 }
 
 
@@ -252,11 +270,12 @@ fn bowyer_watson(points: &Vec<Point>) -> (Vec<[usize; 3]>, Vec<Point>) {
 ///
 /// # Returns:
 /// - A HashMap of edges <-> triangles as described above
+/// - An error as an owned string, explaining the error
 ///
-fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> HashMap<(usize, usize), (usize, usize)> {
+fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> Result<HashMap<(usize, usize), (usize, usize)>, String> {
     // theoretically, if there are 18446744073709551615 or more points, we have a problem.
     if triangles.len() >= usize::MAX {
-        panic!("Why are there so many points?? Cannot default hashmap to infinity");
+        return Err("There were too many triangles to safely set null to usize::MAX".to_owned());
     }
 
     // normalised edge (usize usize) <-> (usize, usize) pointers to triangles
@@ -275,7 +294,7 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> HashMap<(usize, usize), (u
         }
     }
 
-    edge_triangle 
+    Ok(edge_triangle)
 }
 
 
@@ -299,8 +318,9 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> HashMap<(usize, usize), (u
 /// - A vector containing two indices of the point vector, which form the edges of the voronoi diagram
 /// - A HashMap of a site, with a key as an index of the point vector, and a list of
 ///   corresponding indices of the point vector, which form the polygon of the voronoi cell
+/// - An error as an owned string, explaining the error
 ///
-fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_triangles: &HashMap<(usize, usize), (usize, usize)>) -> (Vec<Point>, Vec<(usize, usize)>, HashMap<usize, Vec<usize>>) {
+fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_triangles: &HashMap<(usize, usize), (usize, usize)>) -> Result<(Vec<Point>, Vec<(usize, usize)>, HashMap<usize, Vec<usize>>), String> {
     // vector, the index of the site point corresponds to the index of the triangle in `triangles`
     let mut voronoi_sites: Vec<Point> = Vec::with_capacity(triangles.len());
     voronoi_sites.extend(std::iter::repeat(Point { x: OrderedFloat(0.), y: OrderedFloat(0.) }).take(triangles.len()));
@@ -314,7 +334,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         if let Some(value) = voronoi_sites.get_mut(index) {
             *value = Triangle::circumcenter(&points[triangle[0]], &points[triangle[1]], &points[triangle[2]]);
         } else {
-            panic!("There should've been as many site points as there are triangles");
+            return Err("There should've been as many site points as there are triangles".to_owned());
         }
     }
 
@@ -511,7 +531,11 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         }
         last_point_idx = Some(new_site_point_idx);
     }
-    voronoi_edges.push((last_point_idx.expect("There should have been a last point index, unless no diagram was even created"), first_index));
+    if let Some(lpidx) = last_point_idx {
+        voronoi_edges.push((lpidx, first_index));
+    } else {
+        return Err("There was no last_point_idx when bounding voronoi diagram. Was a diagram created?".to_owned());
+    }
     
     // DEBUG
     /*
@@ -526,7 +550,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
     }
     */
 
-    (voronoi_sites, voronoi_edges, site_vertices)
+    Ok((voronoi_sites, voronoi_edges, site_vertices))
 }
 
 

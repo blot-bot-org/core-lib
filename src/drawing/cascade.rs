@@ -42,7 +42,7 @@ impl DrawMethod for CascadeMethod {
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Vec<u8> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Result<Vec<u8>, String> {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
 
@@ -93,7 +93,9 @@ impl DrawMethod for CascadeMethod {
         }
 
         // move to start position
-        surface.sample_xy(parameters.horizontal_margin, parameters.vertical_margin);
+        if let Err(err_str) = surface.sample_xy(parameters.horizontal_margin, parameters.vertical_margin) {
+            return Err(err_str);
+        };
 
         // for each column, draw every vertical triangle, drawing down or up
         for h in 0..parameters.boxes_horizontal {
@@ -112,18 +114,22 @@ impl DrawMethod for CascadeMethod {
                 
                 if h % 2 == 0 {
                     
-                    self.triangle(&mut surface, center_x, parameters.vertical_margin + going_down_y as f64 * vertical_mm_per_box, horizontal_mm_per_box, line_sample * v, mm_per_sample);
+                    if let Err(err_str) = self.triangle(&mut surface, center_x, parameters.vertical_margin + going_down_y as f64 * vertical_mm_per_box, horizontal_mm_per_box, line_sample * v, mm_per_sample) {
+                        return Err(err_str);
+                    };
 
                 } else {
 
-                    self.triangle_from_bottom(&mut surface, center_x, physical_dimensions.page_height() - parameters.vertical_margin - going_down_y as f64 * vertical_mm_per_box, horizontal_mm_per_box, line_sample * v, mm_per_sample);
+                    if let Err(err_str) = self.triangle_from_bottom(&mut surface, center_x, physical_dimensions.page_height() - parameters.vertical_margin - going_down_y as f64 * vertical_mm_per_box, horizontal_mm_per_box, line_sample * v, mm_per_sample) {
+                        return Err(err_str);
+                    };
                 }
 
             }
         }
 
 
-        surface.current_ins
+        Ok(surface.current_ins)
     }
 }
 
@@ -141,13 +147,27 @@ impl CascadeMethod {
     /// - `samples`: The number of samples used to draw the triangle
     /// - `step_height`: The y movement per sample, going down
     ///
-    fn triangle(&self, surface: &mut DrawSurface, center_x: f64, start_y: f64, max_width: f64, samples: usize, step_height: f64) {
+    /// # Returns:
+    /// - Void if the draw calls suceeded
+    /// - An error as an owned string, explaining the problem
+    ///
+    fn triangle(&self, surface: &mut DrawSurface, center_x: f64, start_y: f64, max_width: f64, samples: usize, step_height: f64) -> Result<(), String> {
         for s in 0..samples {
-            surface.sample_xy(center_x, start_y + step_height * s as f64);
-            surface.sample_xy(center_x - max_width * 0.5 * (1. - s as f64 / samples as f64), start_y + step_height * s as f64);
-            surface.sample_xy(center_x + max_width * 0.5 * (1. - s as f64 / samples as f64), start_y + step_height * s as f64);
-            surface.sample_xy(center_x, start_y + step_height * s as f64);
+            if let Err(err_str) = surface.sample_xy(center_x, start_y + step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x - max_width * 0.5 * (1. - s as f64 / samples as f64), start_y + step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x + max_width * 0.5 * (1. - s as f64 / samples as f64), start_y + step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x, start_y + step_height * s as f64) {
+                return Err(err_str);
+            };
         }
+
+        Ok(())
     }
 
     /// 
@@ -161,13 +181,27 @@ impl CascadeMethod {
     /// - `samples`: The number of samples used to draw the triangle
     /// - `step_height`: The y movement per sample, going up
     ///
-    fn triangle_from_bottom(&self, surface: &mut DrawSurface, center_x: f64, start_y: f64, max_width: f64, samples: usize, step_height: f64) {
+    /// # Returns:
+    /// - Void if the draw calls suceeded
+    /// - An error as an owned string, explaining the problem
+    ///
+    fn triangle_from_bottom(&self, surface: &mut DrawSurface, center_x: f64, start_y: f64, max_width: f64, samples: usize, step_height: f64) -> Result<(), String> {
         for s in 0..samples {
-            surface.sample_xy(center_x, start_y - step_height * s as f64);
-            surface.sample_xy(center_x - max_width * 0.5 * (s as f64 / samples as f64), start_y - step_height * s as f64);
-            surface.sample_xy(center_x + max_width * 0.5 * (s as f64 / samples as f64), start_y - step_height * s as f64);
-            surface.sample_xy(center_x, start_y - step_height * s as f64);
+            if let Err(err_str) = surface.sample_xy(center_x, start_y - step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x - max_width * 0.5 * (s as f64 / samples as f64), start_y - step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x + max_width * 0.5 * (s as f64 / samples as f64), start_y - step_height * s as f64) {
+                return Err(err_str);
+            };
+            if let Err(err_str) = surface.sample_xy(center_x, start_y - step_height * s as f64) {
+                return Err(err_str);
+            };
         }
+        
+        Ok(())
     }
 }
 
