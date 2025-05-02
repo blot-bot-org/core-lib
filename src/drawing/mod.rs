@@ -22,7 +22,7 @@ pub mod dunes;
 /// # Functions:
 /// - `get_id`: Should return the unique ID of a drawing method
 /// - `get_formatted_name`: Should return the formatted name of a drawing method
-/// - `gen_instructions`: Should return the drawing instruction bytes, as a vector. Takes the page parameters.
+/// - `gen_instructions`: Should return the drawing instruction bytes as a vector, or an error. Takes the page parameters.
 ///
 pub trait DrawMethod {
     type DrawParameters;
@@ -35,7 +35,7 @@ pub trait DrawMethod {
 
 /// 
 /// The trait for all drawing parameters to implement.
-/// It requires the implementation of Serialize and Deserialize
+/// It requires the implementation of Serialize and Deserialize.
 ///
 pub trait DrawParameters: Serialize + for<'d> Deserialize<'d> {}
 
@@ -70,6 +70,7 @@ impl<'pd> DrawSurface<'pd> {
     ///
     /// # Returns:
     /// - A blank `DrawSurface` object
+    ///
     fn new(init_x: f64, init_y: f64, physical_dimensions: &PhysicalDimensions) -> DrawSurface {
         let belts = Belts::new_by_cartesian(
             *physical_dimensions.page_horizontal_offset() + init_x,
@@ -132,10 +133,9 @@ impl<'pd> DrawSurface<'pd> {
     /// Pops the last draw call off the instruction list, and reverts the belts to their old
     /// position accordingly.
     ///
-    fn pop_sample(&mut self) {
+    fn pop_sample(&mut self) -> Result<(), String> {
         if self.current_ins.len() < 5 {
-            panic!("cant pop instructions - there are none");
-            // TODO: Error impl
+            return Err("Could not pop instructions, as there were no instructions in the vector.".to_owned());
         }
 
         let _ = self.current_ins.pop().unwrap(); // 0x0C terminator byte
@@ -150,6 +150,8 @@ impl<'pd> DrawSurface<'pd> {
 
         // move the belts in reverse, to revert the instruction. right belt is double-reversed hence not
         self.belts.move_by_steps(-left_steps, right_steps);
+
+        Ok(())
     }
 
     ///
