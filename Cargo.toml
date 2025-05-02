@@ -8,6 +8,7 @@ byteorder = "1.5.0"
 getset = "0.1.5"
 image = { version = "0.25.6", default-features = false, features = ["jpeg", "png"] }
 imageproc = "0.25.0"
+noise = "0.9.0"
 ordered-float = "5.0.0"
 rand = "0.9.0"
 serde = { version = "1.0.219", features = ["derive"] }
