@@ -21,7 +21,14 @@ use std::collections::HashMap;
 pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Result<Vec<Point>, String> {
 
     // open input image
-    let input_image = ImageReader::open(file_path).unwrap().decode().unwrap().into_rgb8();
+    let input_image = match ImageReader::open(file_path) {
+        Ok(img) => {
+            img.decode().unwrap().into_rgb8()
+        },
+        Err(err) => {
+            return Err(format!("Error loading image. {}", err.to_string()).to_owned());
+        }
+    };
     
     // create list of points, place them randomly at darker areas of image
     let mut points: Vec<Point> = Vec::with_capacity(num_points);
@@ -65,7 +72,7 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
 /// - An error as an owned string, explaining the error
 ///
 fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Vec<u8>>, relaxation_tendency: f32) -> Result<(), String> {
-
+    
     // computes the delaunay triangulation
     let (triangles, new_points) = match bowyer_watson(points) {
         Ok((tri, n_p)) => (tri, n_p),
