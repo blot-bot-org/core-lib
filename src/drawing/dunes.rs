@@ -3,13 +3,12 @@ use crate::drawing::{DrawMethod, DrawParameters};
 use crate::hardware::PhysicalDimensions;
 use serde::{Serialize, Deserialize};
 use crate::drawing::DrawSurface;
-use image::{GrayImage, Luma, ImageBuffer};
 
 
 use super::util::heightmap::gen_terrain;
 
 ///
-/// An empty struct to implement the "Lines" draw method on.
+/// An empty struct to implement the "Dunes" draw method on.
 ///
 pub struct DunesMethod;
 
@@ -33,9 +32,9 @@ impl DrawMethod for DunesMethod {
     }
 
     ///
-    /// Generates instructions to perform the lines drawing method.
-    /// This drawing method creates a set of lines which move down the page. It is used for
-    /// testing, only.
+    /// Generates instructions to perform the dunes drawing method.
+    /// This drawing creates a set of lines, whose height is affected by 3 layers of perlin noise.
+    /// The lines are layered to create a semi-2D effect, looking similar to sane dunes.
     ///
     /// # Parameters:
     /// - `physical_dimensions`: A physical dimension object, including paper width / height
@@ -43,6 +42,7 @@ impl DrawMethod for DunesMethod {
     ///
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An error explaining why the drawing instructions could not be generated
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &DunesParameters) -> Result<Vec<u8>, String> {
         
@@ -86,15 +86,12 @@ impl DrawMethod for DunesMethod {
         */
 
 
-        
         for (it_idx, row_idx) in (0..y_samples.len()).step_by(parameters.layer_step).enumerate() {
             // go left else go right
             if it_idx % 2 == 0 {
 
                 for item_idx in 0..y_samples[row_idx].len() {
-                    
                     surface.sample_xy(5. + item_idx as f64 / 5., parameters.vertical_offset + y_samples[row_idx][item_idx]).unwrap();
-
                 }
 
             } else {
@@ -106,32 +103,8 @@ impl DrawMethod for DunesMethod {
             }
         }
 
-
-
-
-
-
         Ok(surface.current_ins)
     }
-}
-
-
-use std::fs::File;
-use std::io::{self, Write};
-use std::fmt::Debug;
-use std::path::Path;
-
-fn save_debug_iter_to_file<I, T, P>(iter: I, path: P) -> io::Result<()>
-where
-    I: IntoIterator<Item = T>,
-    T: Debug,
-    P: AsRef<Path>,
-{
-    let mut file = File::create(path)?;
-    for item in iter {
-        writeln!(file, "{:?}", item)?; // Writes each item with debug formatting
-    }
-    Ok(())
 }
 
 
@@ -139,8 +112,16 @@ where
 /// A set of parameters to instruct the generation of the draw calls.
 ///
 /// # Fields:
-/// - `num_lines`: The number of vertical lines to draw
-/// - `horizontal_margin`: The horizontal margin of the drawing, in millimetres
+/// - `seed`: A seed to use for the random perlin noise
+/// - `horizontal_margin`: The step size for the layer iterator
+/// - `vertical_offset`: A y-offset for the entire drawing
+///
+/// - `base_size`: The size of the base perlin noise
+/// - `base_amplitude`: The amplitude of the mid perlin noise
+/// - `mid_size`: The size of the mid perlin noise
+/// - `mid_amplitude`: The amplitude of the mid perlin noise
+/// - `high_size`: The size of the high perlin noise
+/// - `high_amplitude`: The amplitude of the high perlin noise
 ///
 #[derive(Serialize, Deserialize)]
 pub struct DunesParameters {

@@ -1,6 +1,17 @@
-use noise::{Billow, Fbm, NoiseFn, Perlin, PerlinSurflet, Seedable, Worley};
+use noise::{NoiseFn, PerlinSurflet};
 
-// returns vec of rows, with f32 between 0 <-> 1
+/// 
+/// Generates a 2D vector of perlin noise, with an f64 between 0 and 1 to represent height.
+///
+/// # Parameters:
+/// - `seed`: A number to seed the perlin noise
+/// - `width`: The number of vertical samples
+/// - `height`: The number of horizontal samples
+/// - `base_scale`: The scale of the perlin noise, between 1 and 255
+///
+/// # Returns:
+/// - A 2D vector, with f64 values, in the form Row<Column<f64>>
+///
 fn gen_heightmap(seed: u32, width: usize, height: usize, base_scale: f64) -> Vec<Vec<f64>> {
     let perlin = PerlinSurflet::new(seed);
 
@@ -19,7 +30,20 @@ fn gen_heightmap(seed: u32, width: usize, height: usize, base_scale: f64) -> Vec
 }
 
 
-
+/// 
+/// Generates "terrain", an alias for 3 layers of perlin noise.
+///
+/// # Parameters:
+/// - `seed`: A number to seed the perlin noise
+/// - `width`: The number of vertical samples
+/// - `height`: The number of horizontal samples
+/// - `bs` + `ba`: Perlin noise layer 1's size and amplitude
+/// - `ms` + `ma`: Perlin noise layer 2's size and amplitude
+/// - `hs` + `ha`: Perlin noise layer 3's size and amplitude
+///
+/// # Returns:
+/// - A 2D vector, with f64 values, in the form Row<Column<f64>>
+///
 pub fn gen_terrain(seed: u32, width: usize, height: usize, bs: f64, ba: f64, ms: f64, ma: f64, hs: f64, ha: f64) -> Vec<Vec<u8>> {
     let mut values: Vec<Vec<u8>> = Vec::new();
     for n in 0..height {
@@ -29,8 +53,6 @@ pub fn gen_terrain(seed: u32, width: usize, height: usize, bs: f64, ba: f64, ms:
         }
     }
     
-    // let bs = 100.;
-    // let ba = 200.;
     let base_vals: Vec<Vec<f64>> = gen_heightmap(seed * 2, width, height, bs);
 
     for row in 0..base_vals.len() {
@@ -39,8 +61,6 @@ pub fn gen_terrain(seed: u32, width: usize, height: usize, bs: f64, ba: f64, ms:
         }
     }
 
-    // let ms = 30.;
-    // let ma = 50.;
     let mid_vals: Vec<Vec<f64>> = gen_heightmap(seed * 4, width, height, ms);
 
     for row in 0..mid_vals.len() {
@@ -57,8 +77,6 @@ pub fn gen_terrain(seed: u32, width: usize, height: usize, bs: f64, ba: f64, ms:
         }
     }
 
-    // let hs = 1.;
-    // let ha = 15.;
     let high_vals: Vec<Vec<f64>> = gen_heightmap(seed * 8, width, height, hs);
 
     for row in 0..high_vals.len() {

@@ -33,6 +33,7 @@ impl PhysicalDimensions {
     ///
     /// # Returns:
     /// - A new `PhysicalDimension` instance
+    ///
     pub fn new(motor_interspace: f64, page_horizontal_offset: f64, page_vertical_offset: f64, page_width: f64, page_height: f64) -> PhysicalDimensions {
         PhysicalDimensions { motor_interspace, page_horizontal_offset, page_vertical_offset, page_width, page_height }
     }

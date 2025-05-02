@@ -41,6 +41,7 @@ impl DrawMethod for CascadeMethod {
     ///
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An error explainig why the drawing instructions could not be generated
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Result<Vec<u8>, String> {
         

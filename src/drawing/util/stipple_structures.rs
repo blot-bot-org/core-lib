@@ -120,6 +120,7 @@ impl Triangle {
     ///
     /// # Returns:
     /// - A boolean, true if the point was in the circumcircle
+    ///
     pub fn point_in_circle(test_point: &Point, p0: &Point, p1: &Point, p2: &Point) -> bool {
         let (p1x, p1y) = (p1.x - p0.x, p1.y - p0.y);
         let (p2x, p2y) = (p2.x - p0.x, p2.y - p0.y);

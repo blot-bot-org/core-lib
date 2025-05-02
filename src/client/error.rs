@@ -7,6 +7,7 @@ use thiserror::Error;
 /// - `MachineInUse`: When a target machine is already in use, usually because it's already
 /// drawing.
 /// - `MachineNotFound`: When the target machine is not found on the network.
+/// - `GreetingTimedOut`: When a greeting is sent, but no response is received.
 ///     
 #[derive(Error, Debug)]
 pub enum ClientError {

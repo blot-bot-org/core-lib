@@ -39,6 +39,7 @@ impl DrawMethod for LinesMethod {
     ///
     /// # Returns:
     /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An error, explaning why the drawing instructions could not be created
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Result<Vec<u8>, String> {
         
