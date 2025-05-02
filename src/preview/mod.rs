@@ -23,7 +23,7 @@ pub mod canvas;
 /// - `InstructionError` to explain why the preview was unable to be generated
 ///
 pub fn generate_preview(init_xy: (f64, f64), physical_dim: &PhysicalDimensions, instruction_set: &InstructionSet, path: &str) -> Option<InstructionError> {
-    let mut preview_canvas = canvas::PreviewCanvas::new(210, 297, Some(2));
+    let mut preview_canvas = canvas::PreviewCanvas::new(210, 297, Some(4));
     let step_instructions: Vec<(i16, i16)> = match instruction_set.parse_to_numerical_steps() {
         Ok(value) => value,
         Err(err) => return Some(err)
