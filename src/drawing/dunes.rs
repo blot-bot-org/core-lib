@@ -47,16 +47,22 @@ impl DrawMethod for DunesMethod {
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &DunesParameters) -> Result<Vec<u8>, String> {
         
         let mut surface = DrawSurface::new(0., 0., physical_dimensions);
-        let heightmap_values = gen_terrain(parameters.seed, 1000, 1000, parameters.base_size, parameters.base_amplitude, parameters.mid_size, parameters.mid_amplitude, parameters.high_size, parameters.high_amplitude);
+        
+        let vertical_offset = (physical_dimensions.page_height() - parameters.height as f64) / 2. + parameters.vertical_offset as f64;
+        let horizontal_offset = (physical_dimensions.page_width() - parameters.width as f64) / 2.;
+
+        let samples_width = parameters.sample_per_mm * parameters.width;
+        let layer_height = parameters.height as f64 / parameters.layers as f64;
+
+        let heightmap_values = gen_terrain(parameters.seed, samples_width, parameters.layers, layer_height, parameters.base_size, parameters.base_amplitude, parameters.mid_size, parameters.mid_amplitude, parameters.high_size, parameters.high_amplitude);
 
         let mut y_samples: Vec<Vec<f64>> = Vec::new();
 
         // first, transform height_map to y heights on a page
-        let space_between = 3.;
         for row_idx in 0..heightmap_values.len() {
             y_samples.push(Vec::new());
             for v in heightmap_values.get(row_idx).unwrap() {
-                y_samples[row_idx].push(((4. - (*v as f64) * 4.) + (row_idx as f64 * space_between)) / 16.);
+                y_samples[row_idx].push(row_idx as f64 * layer_height + (*v as f64 / 5.));
             }
         }
 
@@ -71,33 +77,18 @@ impl DrawMethod for DunesMethod {
             }
         }
 
-        /*
-        save_debug_iter_to_file(y_samples.iter().step_by(10), "./out.txt");
-
-        let mut img_buf: ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(1000, 1000);
-
-        for row in 0..heightmap_values.len() {
-            for p in 0..heightmap_values[row].len() {
-                *img_buf.get_pixel_mut(row as u32, p as u32) = Luma([heightmap_values[row][p]]);
-            }
-        }
-
-        img_buf.save("./output.png");
-        */
-
-
-        for (it_idx, row_idx) in (0..y_samples.len()).step_by(parameters.layer_step).enumerate() {
+        for layer_idx in 0..parameters.layers {
             // go left else go right
-            if it_idx % 2 == 0 {
+            if layer_idx % 2 == 0 {
 
-                for item_idx in 0..y_samples[row_idx].len() {
-                    surface.sample_xy(5. + item_idx as f64 / 5., parameters.vertical_offset + y_samples[row_idx][item_idx]).unwrap();
+                for item_idx in 0..y_samples[layer_idx].len() {
+                    surface.sample_xy(horizontal_offset + parameters.width as f64 * (item_idx as f64 / y_samples[layer_idx].len() as f64), vertical_offset + y_samples[layer_idx][item_idx]).unwrap();
                 }
 
             } else {
                     
-                for item_idx in 0..y_samples[row_idx].len() {
-                    surface.sample_xy(5. + (y_samples[row_idx].len() - item_idx) as f64 / 5., parameters.vertical_offset + y_samples[row_idx][y_samples[row_idx].len() - item_idx - 1]).unwrap();
+                for item_idx in 0..y_samples[layer_idx].len() {
+                    surface.sample_xy(physical_dimensions.page_width() - horizontal_offset - parameters.width as f64 * (item_idx as f64 / y_samples[layer_idx].len() as f64), vertical_offset + y_samples[layer_idx][y_samples[layer_idx].len() - item_idx - 1]).unwrap();
                 }
 
             }
@@ -113,8 +104,12 @@ impl DrawMethod for DunesMethod {
 ///
 /// # Fields:
 /// - `seed`: A seed to use for the random perlin noise
-/// - `horizontal_margin`: The step size for the layer iterator
-/// - `vertical_offset`: A y-offset for the entire drawing
+///
+/// - `layers`: The number of vertical layers
+/// - `sample_per_mm`: The number of samples of perlin noise per horizontal millimetre
+/// - `width`: Total width of the drawing, in millimetres
+/// - `height`: Total height of the drawing, in millimetres
+/// - `vertical_offset`: A y-offset for the entire drawing, in millimetres
 ///
 /// - `base_size`: The size of the base perlin noise
 /// - `base_amplitude`: The amplitude of the mid perlin noise
@@ -126,8 +121,12 @@ impl DrawMethod for DunesMethod {
 #[derive(Serialize, Deserialize)]
 pub struct DunesParameters {
     seed: u32,
-    layer_step: usize,
-    vertical_offset: f64,
+
+    layers: usize,
+    sample_per_mm: usize,
+    width: usize,
+    height: usize,
+    vertical_offset: isize,
 
     base_size: f64,
     base_amplitude: f64,
