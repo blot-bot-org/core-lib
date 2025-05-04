@@ -38,12 +38,12 @@ impl DrawMethod for LinesMethod {
     /// - `parameters`: The user-configured parameters to adjust the drawing style
     ///
     /// # Returns:
-    /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An (instruction set, start_x, start_y), represented as a u8 vector and floats respectively
     /// - An error, explaning why the drawing instructions could not be created
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Result<Vec<u8>, String> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        let mut surface = DrawSurface::new(0., 0., physical_dimensions);
+        let mut surface = DrawSurface::new(physical_dimensions);
         
         for i in 0..parameters.num_lines {
             for x in 0..=100 {
@@ -68,7 +68,7 @@ impl DrawMethod for LinesMethod {
             }
         }
 
-        Ok(surface.current_ins)
+        Ok((surface.current_ins, surface.first_sample_x.unwrap_or(0.), surface.first_sample_y.unwrap_or(0.)))
     }
 }
 

@@ -40,12 +40,10 @@ impl DrawMethod for ScribbleMethod {
     /// - `parameters`: The user-configured parameters to adjust the drawing style
     ///
     /// # Returns:
-    /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An (instruction set, start_x, start_y), represented as a u8 vector and floats respectively
     /// - An error explaining why the drawing instructions could not be generated
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<Vec<u8>, String> {
-        
-        let mut surface = DrawSurface::new(0., 0., physical_dimensions);
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
         let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, parameters.relaxation_tendency) {
             Ok(val) => val,
@@ -56,6 +54,7 @@ impl DrawMethod for ScribbleMethod {
 
         let radius_divisor = ((100 - (parameters.scribble_size)) as f32 / 100.) * 5.;
 
+        let mut surface = DrawSurface::new(physical_dimensions);
         for t in tour.windows(2) {
             let scaled_x = stippled_points[t[0]].x / 5.;
             let scaled_y = stippled_points[t[0]].y / 5.;
@@ -77,7 +76,7 @@ impl DrawMethod for ScribbleMethod {
             }
         }
 
-        Ok(surface.current_ins)
+        Ok((surface.current_ins, surface.first_sample_x.unwrap_or(0.), surface.first_sample_y.unwrap_or(0.)))
     }
 }
 

@@ -14,10 +14,15 @@ use error::InstructionError;
 ///
 /// # Fields:
 /// - `binary`: Vector of bytes, containing the raw binary instructions
+/// - `buffer_bound_cache`: The bounds of slices to be passed to the machine
+/// - `init_x`: The initial x position of the pen in a given drawing
+/// - `init_y`: The initial y position of the pen in a given drawing
 ///
 pub struct InstructionSet {
     binary: Vec<u8>,
     buffer_bound_cache: OnceCell<Vec<(usize, usize)>>,
+    init_x: f64,
+    init_y: f64,
 }
 
 impl InstructionSet {
@@ -27,15 +32,17 @@ impl InstructionSet {
     ///
     /// # Parameters:
     /// - `ins_bytes`: Vector of bytes, containing the proposed raw binary instructions
+    /// - `init_x`: The initial x position of the pen in a given drawing
+    /// - `init_y`: The initial y position of the pen in a given drawing
     ///
     /// # Returns:
     /// - An InstructionSet with a valid binary sequence
     /// - An error explaining why the provided `ins` was invalid
     /// 
-    pub fn new(ins_bytes: Vec<u8>) -> Result<InstructionSet, InstructionError> {
+    pub fn new(ins_bytes: Vec<u8>, init_x: f64, init_y: f64) -> Result<InstructionSet, InstructionError> {
         match is_stream_valid(&ins_bytes) {
             None => {
-                Ok(InstructionSet { binary: ins_bytes, buffer_bound_cache: OnceCell::new() })
+                Ok(InstructionSet { binary: ins_bytes, buffer_bound_cache: OnceCell::new(), init_x, init_y })
             }
             Some(err) => {
                 Err(err)
@@ -49,13 +56,15 @@ impl InstructionSet {
     ///
     /// # Parameters:
     /// - `ins_bytes`: Vector of bytes, containing the proposed raw binary instructions
+    /// - `init_x`: The initial x position of the pen in a given drawing
+    /// - `init_y`: The initial y position of the pen in a given drawing
     /// - `start_idx`: Index of byte to start on, must be within the length of `ins_bytes`
     /// 
     /// # Returns:
     /// - An InstructionSet with a valid binary sequence
     /// - An error explaining why the provided `ins` was invalid
     /// 
-    pub fn new_from_idx(ins_bytes: Vec<u8>, start_idx: usize) -> Result<InstructionSet, InstructionError> {
+    pub fn new_from_idx(ins_bytes: Vec<u8>, init_x: f64, init_y: f64, start_idx: usize) -> Result<InstructionSet, InstructionError> {
         if start_idx >= ins_bytes.len() {
             return Err(InstructionError::StartOutOfBounds { start_idx, upper_bound: ins_bytes.len() });
         }
@@ -63,7 +72,7 @@ impl InstructionSet {
         match is_stream_valid(&ins_bytes[start_idx..].to_vec()) {
             None => {
                 // ideally we wouldn't reallocate here but whatever
-                Ok(InstructionSet { binary: ins_bytes[start_idx..].to_vec(), buffer_bound_cache: OnceCell::new() })
+                Ok(InstructionSet { binary: ins_bytes[start_idx..].to_vec(), buffer_bound_cache: OnceCell::new(), init_x, init_y })
             }
             Some(err) => {
                 Err(err)
@@ -159,6 +168,14 @@ impl InstructionSet {
     pub fn get_binary(&self) -> &Vec<u8> {
         &self.binary
     }
+
+    ///
+    /// # Returns:
+    /// - The initial pen position of the drawing
+    ///
+    pub fn get_init(&self) -> (f64, f64) {
+        (self.init_x, self.init_y)   
+    }
 }
 
 
@@ -225,64 +242,66 @@ mod tests {
     #[test]
     #[should_panic]
     fn too_small_chunk_size() {
-        InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes()).unwrap().get_buffer_bounds(6).unwrap();
+        InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_buffer_bounds(6).unwrap();
     }
 
     #[test]
     fn valid_instruction_stream() {
-        let is = InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes()).unwrap().get_buffer_bounds(11).unwrap();
-        assert_eq!(is, [(0, 9), (10, 14)]);
+        let is = InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap();
+        let bb = is.get_buffer_bounds(11).unwrap();
+        assert_eq!(*bb, [(0, 9), (10, 14)]);
     }
 
     #[test]
     fn invalid_instruction_stream_0xc() {
-        assert!(InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes()).is_err());
+        assert!(InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes(), 0., 0.).is_err());
     }
 
     #[test]
     fn invalid_instruction_stream_indexed_0xc() {
-        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes(), 2).is_err());
+        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes(), 0., 0., 2).is_err());
     }
 
     #[test]
     fn empty_instruction_stream() {
-        assert!(InstructionSet::new("".to_owned().into_bytes()).is_err());
+        assert!(InstructionSet::new("".to_owned().into_bytes(), 0., 0.).is_err());
     }
 
     #[test]
     fn empty_instruction_stream_indexed() {
-        assert!(InstructionSet::new_from_idx("".to_owned().into_bytes(), 4).is_err());
+        assert!(InstructionSet::new_from_idx("".to_owned().into_bytes(), 0., 0., 4).is_err());
     }
 
     #[test]
     fn invalid_instruction_stream_indexed() {
-        assert!(InstructionSet::new_from_idx("".to_owned().into_bytes(), 4).is_err());
+        assert!(InstructionSet::new_from_idx("".to_owned().into_bytes(), 0., 0., 4).is_err());
     }
 
     #[test]
     fn valid_instruction_stream_indexed_oub() {
-        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 14).is_err());
+        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 14).is_err());
     }
 
     #[test]
     fn valid_instruction_stream_indexed() {
-        let is = InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 5).unwrap().get_buffer_bounds(64).unwrap();
-        assert_eq!(is, [(0, 9)]);
+        let is = InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 5).unwrap();
+        let bb = is.get_buffer_bounds(64).unwrap();
+        assert_eq!(*bb, [(0, 9)]);
     }
 
     #[test]
     fn validate_valid_stream() {
-        assert!(is_stream_valid(&("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes())).is_none());
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_none());
     }
 
     #[test]
     fn validate_invalid_stream() {
-        assert!(is_stream_valid(&("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes())).is_some());
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
     }
 
     #[test]
     fn validate_incomplete_stream() {
-        assert!(is_stream_valid(&("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes())).is_some());
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
     }
 
 }

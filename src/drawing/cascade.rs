@@ -40,12 +40,11 @@ impl DrawMethod for CascadeMethod {
     /// - `parameters`: The user-configured parameters to adjust the drawing style
     ///
     /// # Returns:
-    /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An (instruction set, start_x, start_y), represented as a u8 vector and floats respectively
     /// - An error explainig why the drawing instructions could not be generated
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Result<Vec<u8>, String> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        let mut surface = DrawSurface::new(0., 0., physical_dimensions);
 
         // calculate constants
         let vertical_mm_per_box = (physical_dimensions.page_height() - 2. * parameters.vertical_margin) / parameters.boxes_vertical as f64;
@@ -55,6 +54,9 @@ impl DrawMethod for CascadeMethod {
 
         // the array holds a list of arrays, each containing something like [1, 1, 1, 3, 2, 1, 1, 5] where it would draw a triangle that is 1/2/3/5 "blocks" tall
         let mut triangle_pattern: Vec<Vec<usize>> = Vec::with_capacity(parameters.boxes_horizontal);
+
+        let mut surface = DrawSurface::new(physical_dimensions);
+
         for i in 0..parameters.boxes_horizontal {
             triangle_pattern.push(Vec::new());
 
@@ -130,7 +132,7 @@ impl DrawMethod for CascadeMethod {
         }
 
 
-        Ok(surface.current_ins)
+        Ok((surface.current_ins, surface.first_sample_x.unwrap_or(0.), surface.first_sample_y.unwrap_or(0.)))
     }
 }
 

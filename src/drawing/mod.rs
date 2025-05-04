@@ -30,7 +30,7 @@ pub trait DrawMethod {
     fn get_id(&self) -> &'static str;
     fn get_formatted_name(&self) -> &'static str;
 
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, params: &Self::DrawParameters) -> Result<Vec<u8>, String>;
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, params: &Self::DrawParameters) -> Result<(Vec<u8>, f64, f64), String>;
 }
 
 /// 
@@ -44,15 +44,15 @@ pub trait DrawParameters: Serialize + for<'d> Deserialize<'d> {}
 /// called to construct an image.
 ///
 /// # Fields:
-/// - `init_x`: The initial x position of the pen, in millimetres from the top-left motor
-/// - `init_y`: The initial y position of the pen, in millimetres from the top-left motor
+/// - `first_sample_x`: The initial x position of the pen, in millimetres from the top-left motor
+/// - `first_sample_y`: The initial y position of the pen, in millimetres from the top-left motor
 /// - `current_ins`: The vector containing the current instructions
 /// - `physical_dimensions`: The physical parameters of the machine
 /// - `belts`: An object representing the belts
 ///
 pub struct DrawSurface<'pd> {
-    init_x: f64,
-    init_y: f64,
+    first_sample_x: Option<f64>,
+    first_sample_y: Option<f64>,
 
     current_ins: Vec<u8>,
     physical_dimensions: &'pd PhysicalDimensions,
@@ -64,26 +64,22 @@ impl<'pd> DrawSurface<'pd> {
     /// Creates a new drawing surface, intialising belts to the init_x, init_y length.
     ///
     /// # Parameters:
-    /// - `init_x`: The initial x position of the pen, relative to the top left of the paper in millimetres
-    /// - `init_y`: The initial y position of the pen, relative to the top left of the paper in millimetres
     /// - `physical_dimensions`: A physical dimensions object representing the current hardware
     ///
     /// # Returns:
     /// - A blank `DrawSurface` object
     ///
-    fn new(init_x: f64, init_y: f64, physical_dimensions: &PhysicalDimensions) -> DrawSurface {
-        let belts = Belts::new_by_cartesian(
-            *physical_dimensions.page_horizontal_offset() + init_x,
-            *physical_dimensions.page_vertical_offset() + init_y,
-            *physical_dimensions.motor_interspace()
-        );
+    fn new(physical_dimensions: &PhysicalDimensions) -> DrawSurface {
+        let belts = Belts::new_by_cartesian(0., 0., 0.);
 
-        DrawSurface { init_x, init_y, current_ins: Vec::new(), physical_dimensions, belts }
+        DrawSurface { current_ins: Vec::new(), physical_dimensions, belts, first_sample_x: None, first_sample_y: None }
     }
 
     /// 
     /// Moves the pen to a new x, y position and instructions a line between the preview and
     /// current pen position.
+    /// If there is no initial position, we set the passed x, y as the initial position and update
+    /// the belts to reflect this. No instructions are added in this case.
     ///
     /// # Parameters:
     /// - `x`: The new pen x position, relative to the top left of the paper in millimetres
@@ -92,8 +88,26 @@ impl<'pd> DrawSurface<'pd> {
     /// # Returns:
     /// - Void if the function suceeded
     /// - An error as an owned string, explaining the problem
-    //
+    ///
     fn sample_xy(&mut self, x: f64, y: f64) -> Result<(), String> {
+        if self.first_sample_x.is_none() || self.first_sample_y.is_none() {
+            // here we basically initialise the object
+            // the first sample marks the first point of the belts
+            // it does not create any instructions
+
+            self.first_sample_x = Some(x);
+            self.first_sample_y = Some(y);
+
+            let belts = Belts::new_by_cartesian(
+                self.physical_dimensions.page_horizontal_offset() + x,
+                self.physical_dimensions.page_vertical_offset() + y,
+                *self.physical_dimensions.motor_interspace()
+            );
+            self.belts = belts;
+
+            return Ok(());
+        }
+
         let (new_left, new_right) = cartesian_to_belt(*self.physical_dimensions.page_horizontal_offset() + x, *self.physical_dimensions.page_vertical_offset() + y, *self.physical_dimensions.motor_interspace());
 
         // delta length of belts in mm
@@ -161,5 +175,27 @@ impl<'pd> DrawSurface<'pd> {
     fn get_xy(&self) -> (f64, f64) {
         let (total_x, total_y) = self.belts.get_as_cartesian();
         (total_x - self.physical_dimensions.page_horizontal_offset(), total_y - self.physical_dimensions.page_vertical_offset())
+    }
+
+    /// 
+    /// TODO: Lerp between 0, 0 -> init_x, init_y appropriately to fit ins into i16 bytes
+    ///
+    /// Creates the drawing instructions required to move the pen from 0, 0 on the page to the
+    /// given point, used to position the pen initially to start the drawing.
+    ///
+    /// # Parameters:
+    /// - `physical_dimensions`: A physical dimensions object representing the current hardware
+    /// - `init_x`: The target x position to move to
+    /// - `init_y`: The target x position to move to
+    ///
+    /// # Returns:
+    /// - A vector of instruction bytes
+    ///
+    pub fn pen_to_start_ins(physical_dimensions: &PhysicalDimensions, init_x: f64, init_y: f64) -> Vec<u8> {
+        let mut ds = DrawSurface::new(physical_dimensions);
+        ds.sample_xy(0., 0.); // init at to top/left of page
+        ds.sample_xy(init_x, init_y); // move to start pos
+        
+        ds.current_ins
     }
 }

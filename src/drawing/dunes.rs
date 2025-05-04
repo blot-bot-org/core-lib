@@ -41,12 +41,11 @@ impl DrawMethod for DunesMethod {
     /// - `parameters`: The user-configured parameters to adjust the drawing style
     ///
     /// # Returns:
-    /// - An instruction set, represented as a u8 vector, containing the draw calls
+    /// - An (instruction set, start_x, start_y), represented as a u8 vector and floats respectively
     /// - An error explaining why the drawing instructions could not be generated
     ///
-    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &DunesParameters) -> Result<Vec<u8>, String> {
+    fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &DunesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        let mut surface = DrawSurface::new(0., 0., physical_dimensions);
         
         let vertical_offset = (physical_dimensions.page_height() - parameters.height as f64) / 2. + parameters.vertical_offset as f64;
         let horizontal_offset = (physical_dimensions.page_width() - parameters.width as f64) / 2.;
@@ -77,6 +76,8 @@ impl DrawMethod for DunesMethod {
             }
         }
 
+        let mut surface = DrawSurface::new(physical_dimensions);
+
         for layer_idx in 0..parameters.layers {
             // go left else go right
             if layer_idx % 2 == 0 {
@@ -94,7 +95,8 @@ impl DrawMethod for DunesMethod {
             }
         }
 
-        Ok(surface.current_ins)
+        println!("{}, {}", surface.first_sample_x.unwrap(), surface.first_sample_y.unwrap());
+        Ok((surface.current_ins, surface.first_sample_x.unwrap_or(0.), surface.first_sample_y.unwrap_or(0.)))
     }
 }
 
