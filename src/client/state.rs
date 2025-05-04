@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::instruction::InstructionSet;
 
 use super::error::ClientError;
+use super::read_header;
 
 /// 
 /// A representation of a connection to the drawing machine.
@@ -24,6 +25,8 @@ use super::error::ClientError;
 pub struct ClientState {}
 
 impl ClientState {
+
+
     ///
     /// Creates a new TcpStream or an error. The TcpStream can be separated into the read/write halves in an implementation.
     /// This function also initialises a drawing with greeting bytes, if a connection is
@@ -37,7 +40,7 @@ impl ClientState {
     /// - An owned TcpStream
     /// - A `ClientError` if the connection could not be established
     ///
-    pub async fn new(addr: &str, port: u16) -> Result<TcpStream, ClientError> {
+    pub async fn new(addr: &str, port: u16) -> Result<(TcpStream, MachineConfiguration), ClientError> {
         // attempt to connect to the socket
         let socket = TcpStream::connect(format!("{}:{}", addr, port)).await;
         if let Err(_) = socket {
@@ -48,7 +51,7 @@ impl ClientState {
 
         // send greeting byte and read response
         let _ = safe_socket.write_all(&[0x00, 0x01]).await;
-        let mut inc_buffer = [0; 256];
+        let mut inc_buffer = [0; 255];
         if let Err(_) = safe_socket.read(&mut inc_buffer).await {
             return Err(ClientError::GreetingTimedOut);
         };
@@ -56,20 +59,23 @@ impl ClientState {
         if *inc_buffer.get(0).unwrap() == 0x01 {
             // machine is okay to get started with drawing. so initialise machine config, and
             // return the client state instance so the implementation (frontend, cli) can takeover
-            
             let (protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width) = read_header(&inc_buffer);
-            // can init to machine_configuration if needed
-            
-            println!("machinedrawing ready to draw...\nmachine_protocol:{}\nmax_buffer_size:{}\nmax_motor_speed:{}\nmin_pulse_width:{}", protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width);
+            let machine_configuration = MachineConfiguration { protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width };
+
+            if machine_configuration.instruction_buffer_size < 1024 {
+                return Err(ClientError::InsBufferSmall { size: machine_configuration.instruction_buffer_size });
+            }
+
+            return Ok((safe_socket, machine_configuration));
 
         } else if *inc_buffer.get(0).unwrap() == 0x00 {
             // machine is NOT okay to get started. protocol should parse this here
             return Err(ClientError::MachineInUse);
-        } else { // TODO firmware returns protocol, return invalid protocol
-            return Err(ClientError::MachineInUse);
-        }
 
-        Ok(safe_socket)
+        } else { // TODO firmware returns protocol, return invalid protocol
+            return Err(ClientError::InvalidBytes { reason: "Sent a greeting but the response header was not 0x01".to_owned() })
+
+        }
     }
 
 
@@ -111,7 +117,7 @@ impl ClientState {
     /// - `ins_set`: The drawing instruction set
     /// - `emit`: A callback function to emit updates from the function
     ///
-    pub async fn listen<F>(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>, buf_idx: &Arc<Mutex<usize>>, ins_set: &InstructionSet, mut emit: F)
+    pub async fn listen<F>(reader: &mut OwnedReadHalf, write_ref: &Arc<Mutex<Option<OwnedWriteHalf>>>, buf_idx: &Arc<Mutex<usize>>, ins_set: &InstructionSet, machine_config: &MachineConfiguration, mut emit: F)
     where
         F: FnMut(String) + Send + 'static,
     {
@@ -133,7 +139,7 @@ impl ClientState {
                 let mut next_buf_lock = buf_idx.lock().await;
                 *next_buf_lock += 1;
 
-                let bounds = ins_set.get_buffer_bounds(32768).unwrap();
+                let bounds = ins_set.get_buffer_bounds(machine_config.instruction_buffer_size as usize).unwrap();
 
                 if *next_buf_lock - 1 == bounds.len() {
 
@@ -180,71 +186,13 @@ impl ClientState {
 /// - `max_motor_speed`: The maximum steps per second
 /// - `min_pulse_width`: The minimum pulse width of a motor step, in nanoseconds
 ///
-struct MachineConfiguration {
-    protocol_version: u16,
-    instruction_buffer_size: u32,
-    max_motor_speed: u32,
-    min_pulse_width: u32,
+pub struct MachineConfiguration {
+    pub protocol_version: u16,
+    pub instruction_buffer_size: u32,
+    pub max_motor_speed: u32,
+    pub min_pulse_width: u32,
 }
 
 
 
-/// 
-/// Converts 2 bytes to a u16
-///
-/// # Parameters:
-/// - `array`: The byte buffer
-/// - `index`: The first-byte's index
-/// 
-/// # Returns:
-/// - The value of the bytes, as a u16
-///
-fn bytes_to_u16(array: &[u8], index: usize) -> u16 {
-    if index + 1 > array.len() {
-        println!("Error converting byteslice to u16 - bytes out of array index");
-        return 0;
-    }
 
-    (array[index] as u16) << 8 | array[index + 1] as u16
-}
-
-/// 
-/// Converts 4 bytes to a u32
-///
-/// # Parameters:
-/// - `array`: The byte buffer
-/// - `index`: The first-byte's index
-/// 
-/// # Returns:
-/// - The value of the bytes, as a u32
-///
-fn bytes_to_u32(array: &[u8], index: usize) -> u32 {
-    if index + 3 > array.len() {
-        println!("Error converting byteslice to u32 - bytes out of array index");
-        return 0;
-    }
-
-     (array[index] as u32) << 24 | (array[index + 1] as u32) << 16 | (array[index + 2] as u32) << 8 | array[index + 3] as u32
-}
-
-/// 
-/// Extracts and returns bytes from the greeting response
-///
-/// # Parameters:
-/// - `header`: The incoming buffer
-///
-/// # Returns:
-/// - (protocol_version, instruction_buffer_size, max_motor_speed, min_pulse_width) as reported by
-/// the machine
-///
-fn read_header(header: &[u8; 256]) -> (u16, u32, u32, u32) {
-    // ignore first byte.
-    
-    (
-        bytes_to_u16(header, 1),
-        // start from ins here, 4 bytes, ignoring it for now
-        bytes_to_u32(header, 7),
-        bytes_to_u32(header, 11),
-        bytes_to_u32(header, 15),
-    )
-}
