@@ -13,8 +13,7 @@ pub mod canvas;
 /// Performs the provided motor instructions on a canvas, and saves the file.
 ///
 /// # Parameters:
-/// - `init_x`: The initial x value of the pen, relative to the top left motor shaft
-/// - `init_y`: The initial y value of the pen, relative to the top left motor shaft
+/// - `init_xy`: The initial x and y value of the pen, relative to the top left motor shaft
 /// - `instruction_set`: The instruction set to preview
 /// - `path`: The path to save the preview image to - *no checks are done to confirm the directory exists*
 ///
@@ -28,7 +27,7 @@ pub fn generate_preview(init_xy: (f64, f64), physical_dim: &PhysicalDimensions, 
         Ok(value) => value,
         Err(err) => return Some(err)
     };
-
+    
     let mut belts = belts::Belts::new_by_cartesian(physical_dim.page_horizontal_offset() + init_xy.0, physical_dim.page_vertical_offset() + init_xy.1, *physical_dim.motor_interspace());
     let mut last_xy = belts.get_as_cartesian();
 
