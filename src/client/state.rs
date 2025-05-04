@@ -153,7 +153,7 @@ impl ClientState {
                 
                 // this is a little console progress update
                 // println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
-                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions ("#.to_owned() + (format!("{}/{}", *next_buf_lock, ins_set.get_buffer_bounds(32768).unwrap().len())).as_str() + r#")"}"#);
+                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions ("#.to_owned() + (format!("{}/{}", *next_buf_lock, bounds.len())).as_str() + r#")"}"#);
 
 
                 let (lb, ub) = bounds.get(*next_buf_lock - 1).unwrap();

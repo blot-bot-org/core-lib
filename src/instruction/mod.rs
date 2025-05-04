@@ -4,6 +4,8 @@
 
 pub mod error;
 
+use once_cell::sync::OnceCell;
+
 use byteorder::{BigEndian, ByteOrder};
 use error::InstructionError;
 
@@ -15,6 +17,7 @@ use error::InstructionError;
 ///
 pub struct InstructionSet {
     binary: Vec<u8>,
+    buffer_bound_cache: OnceCell<Vec<(usize, usize)>>,
 }
 
 impl InstructionSet {
@@ -32,7 +35,7 @@ impl InstructionSet {
     pub fn new(ins_bytes: Vec<u8>) -> Result<InstructionSet, InstructionError> {
         match is_stream_valid(&ins_bytes) {
             None => {
-                Ok(InstructionSet { binary: ins_bytes })
+                Ok(InstructionSet { binary: ins_bytes, buffer_bound_cache: OnceCell::new() })
             }
             Some(err) => {
                 Err(err)
@@ -60,7 +63,7 @@ impl InstructionSet {
         match is_stream_valid(&ins_bytes[start_idx..].to_vec()) {
             None => {
                 // ideally we wouldn't reallocate here but whatever
-                Ok(InstructionSet { binary: ins_bytes[start_idx..].to_vec() })
+                Ok(InstructionSet { binary: ins_bytes[start_idx..].to_vec(), buffer_bound_cache: OnceCell::new() })
             }
             Some(err) => {
                 Err(err)
@@ -79,40 +82,43 @@ impl InstructionSet {
     /// - A vector of tuples, denoting the index boundaries of buffers
     /// - An error explaining why the index boundaries could not be computed
     ///
-    pub fn get_buffer_bounds(&self, max_chunk_size: usize) -> Result<Vec<(usize, usize)>, InstructionError> {
-        if max_chunk_size < 8 {
-            return Err(InstructionError::BufferTooSmall(max_chunk_size));
-        }
+    pub fn get_buffer_bounds(&self, max_chunk_size: usize) -> Result<&Vec<(usize, usize)>, InstructionError> {
 
-        let mut chunk_bounds: Vec<(usize, usize)> = vec![];
-        let mut start_idx: usize = 0;
-
-        loop {
-            // calculate the maximum end size of the next buffer
-            let mut end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1);
-            
-            // trim the buffer down to a full instruction. must be a multiple of 5 for now, must
-            // change when additional instruction bytes are available!
-            while *self.binary.get(end_idx).unwrap() != 0x0C && end_idx > 0 || (end_idx - start_idx + 1) % 5 != 0 {
-                end_idx -= 1;
+        self.buffer_bound_cache.get_or_try_init(|| {
+            if max_chunk_size < 8 {
+                return Err(InstructionError::BufferTooSmall(max_chunk_size));
             }
 
-            if end_idx == 0 { // should be impossible as we've verified instructions exist already
-                return Err(InstructionError::EmptyInstructionSet);
+            let mut chunk_bounds: Vec<(usize, usize)> = vec![];
+            let mut start_idx: usize = 0;
+
+            loop {
+                // calculate the maximum end size of the next buffer
+                let mut end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1);
+                
+                // trim the buffer down to a full instruction. must be a multiple of 5 for now, must
+                // change when additional instruction bytes are available!
+                while *self.binary.get(end_idx).unwrap() != 0x0C && end_idx > 0 || (end_idx - start_idx + 1) % 5 != 0 {
+                    end_idx -= 1;
+                }
+
+                if end_idx == 0 { // should be impossible as we've verified instructions exist already
+                    return Err(InstructionError::EmptyInstructionSet);
+                }
+
+                chunk_bounds.push((start_idx, end_idx));
+                
+                // if we've buffered all instructions, break
+                if end_idx == self.binary.len() - 1 {
+                    break;
+                }
+                
+                // we add this to make the indexes inclusive
+                start_idx = end_idx + 1;
             }
 
-            chunk_bounds.push((start_idx, end_idx));
-            
-            // if we've buffered all instructions, break
-            if end_idx == self.binary.len() - 1 {
-                break;
-            }
-            
-            // we add this to make the indexes inclusive
-            start_idx = end_idx + 1;
-        }
-
-        Ok(chunk_bounds)
+            Ok(chunk_bounds)
+        })
     }
 
     ///
@@ -135,7 +141,7 @@ impl InstructionSet {
         // we don't have to loop through each instruction buffer to print it, but might as well for
         // safety / more accurate preview
         for (start_idx, end_idx) in result_buffer_bounds {
-            for idx in (start_idx..=end_idx).step_by(5) {
+            for idx in (*start_idx..=*end_idx).step_by(5) {
                 let left_steps = BigEndian::read_i16(&[*self.binary.get(idx).unwrap() as u8, *self.binary.get(idx + 1).unwrap() as u8]);
                 let right_steps = BigEndian::read_i16(&[*self.binary.get(idx + 2).unwrap() as u8, *self.binary.get(idx + 3).unwrap() as u8]);
 
