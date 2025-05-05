@@ -1,6 +1,8 @@
+use std::time::Duration;
 use std::{io::Read, net::TcpStream};
 use std::io::prelude::*;
 use error::ClientError;
+use byteorder::{ByteOrder, BigEndian};
 
 use crate::{drawing::DrawSurface, hardware::PhysicalDimensions, instruction::InstructionSet};
 
@@ -83,14 +85,46 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
 }
 
 
+/// 
+/// Calculates the length, in seconds, a drawing will take.
+/// By taking the raw bytes as a parameter, you can take slices to recalculate the speed
+/// as the drawing progresses.
+///
+/// # Parameters:
+/// - `ins_bytes`: A valid instruction set as a slice of bytes
+/// - `max_motor_speed`: The motor steps per second
+///
+/// # Returns:
+/// - A `Duration` of the time taken to draw the drawing
+///
+pub fn calculate_draw_time(ins_bytes: &[u8], max_motor_speed: u32, min_pulse_width: u32) -> Duration {
+    let mut total_secs: f64 = 0.;
+    let mut s_idx = 0;
+    let mut total_its: usize = 0;
 
+    loop {
+        total_its += 1;
 
+        let mut e_idx = s_idx;
+        while ins_bytes[e_idx] != 0x0C {
+            e_idx += 1;
+        }
 
+        let left_steps = BigEndian::read_i16(&ins_bytes[s_idx..=s_idx+1]).abs();
+        let right_steps = BigEndian::read_i16(&ins_bytes[s_idx+2..=s_idx+3]).abs();
 
+        let most_steps = left_steps.max(right_steps);
+        total_secs += most_steps as f64 / max_motor_speed as f64;
 
+        if e_idx >= ins_bytes.len() - 1 {
+            return Duration::from_secs(total_secs.round() as u64);
+        } else if total_its > ins_bytes.len() {
+            panic!("Couldn't parse the instructions for timing generation, they were invalid.");
+        }
 
-
-
+        s_idx = e_idx + 1;
+    }
+}
 
 
 
