@@ -5,6 +5,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use std::sync::Arc;
 
 use crate::instruction::InstructionSet;
+use crate::client::calculate_draw_time;
 
 use super::error::ClientError;
 use super::read_header;
@@ -157,19 +158,25 @@ impl ClientState {
                     return;
                 }
                 
-                // this is a little console progress update
-                // println!("Sending more instructions (buf_idx {}/{})", *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len());
-                emit(r#"{"event":"drawing", "message":"Sent more drawing instructions ("#.to_owned() + (format!("{}/{}", *next_buf_lock, bounds.len())).as_str() + r#")"}"#);
-
 
                 let (lb, ub) = bounds.get(*next_buf_lock - 1).unwrap();
-                drop(next_buf_lock);
 
                 let mut write_lock = write_ref.lock().await;
                 let writer = write_lock.as_mut().unwrap();
                 let _ = writer.write_all(&[0x01]).await;
                 let _ = writer.write_all(&ins_set.get_binary()[*lb..=*ub]).await;
+                
+                // this is a little progress update
+                // event:drawing, new_ins: bytes:bytes (num/of num) time:newseconds
+                let remaining_draw_time = calculate_draw_time(&ins_set.get_binary()[*lb..], machine_config.max_motor_speed, machine_config.min_pulse_width).as_secs();
+                emit(
+                    format!(
+                        r#"{{"event":"drawing", "ins_pos":"{}", "secs_remaining":"{}"}}"#, format!("{} 🡲 {} ({}/{})", lb, ub, *next_buf_lock, ins_set.get_buffer_bounds(4096).unwrap().len()), remaining_draw_time
+                    )
+                );
+
                 drop(write_lock);
+                drop(next_buf_lock);
             }
         }
     }
