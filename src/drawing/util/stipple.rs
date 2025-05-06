@@ -78,6 +78,7 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
         Ok((tri, n_p)) => (tri, n_p),
         Err(err_str) => return Err(err_str),
     };
+
     let edge_triangles: HashMap<(usize, usize), (usize, usize)> = match get_edge_triangles(&triangles) {
         Ok(val) => val,
         Err(err_str) => return Err(err_str),
@@ -108,8 +109,8 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
             total_weight += weight;
         }
 
-        let centroid_x = sum_weighted_x / total_weight;
-        let centroid_y = sum_weighted_y / total_weight;
+        let centroid_x = sum_weighted_x / total_weight.max(1.);
+        let centroid_y = sum_weighted_y / total_weight.max(1.);
 
         let lerp_x = new_points[site].x + (centroid_x - *new_points[site].x) * relaxation_tendency;
         let lerp_y = new_points[site].y + (centroid_y - *new_points[site].y) * relaxation_tendency;
@@ -496,6 +497,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
     
     let mut last_point_idx: Option<usize> = None;
     let mut first_index = 0_usize; // used for the final join, to cycle it
+
     for intersection_idx in 0..intersection_points.len() {
         let (edge_index, point) = intersection_points[intersection_idx];
 
