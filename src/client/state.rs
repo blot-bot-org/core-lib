@@ -101,8 +101,26 @@ impl ClientState {
         // 0x01 = pause, 0x00 = resume
         let _ = writer.write_all(&[0x04, flag_byte]).await;
 
-        emit(r#"{"event":"drawing", "message":"The drawing was "#.to_owned() + (if flag_byte == 0x01 { "paused" } else { "resumed" }) + r#""}"#);
+        emit(r#"{"event":"pause", "is_paused":""#.to_owned() + (if flag_byte == 0x01 { "1" } else { "0" }) + r#""}"#);
     } 
+
+    /// 
+    /// TODO: Possibly add proper packet for graceful shutdown? Return current ins?
+    ///
+    /// Shuts the socket down, hence cancelling the drawing.
+    ///
+    /// # Parameters:
+    /// - `writer`: A mutex-locked TcpStream write half
+    /// - `emit`: A callback function to emit updates from the function
+    ///
+    pub async fn stop<F>(writer: &mut OwnedWriteHalf, mut emit: F)
+    where
+        F: FnMut(String) + Send + 'static {
+        // shutdown byte
+        let _ = writer.write_all(&[0x05]).await; 
+        let _ = writer.shutdown().await;
+        emit(r#"{"event":"shutdown"}"#.to_owned());
+    }
 
 
     /// 
@@ -154,6 +172,8 @@ impl ClientState {
                     drop(write_lock);
                     drop(next_buf_lock);
 
+                    emit(r#"{"event":"drawing_finished"}"#.to_owned());
+
                     // println!("Drawing has finished. Stopped listen loop.");
                     return;
                 }
@@ -177,6 +197,11 @@ impl ClientState {
 
                 drop(write_lock);
                 drop(next_buf_lock);
+                continue;
+            }
+
+            if *incoming_buf.get(0).unwrap() == 0x05 {
+                return;
             }
         }
     }
