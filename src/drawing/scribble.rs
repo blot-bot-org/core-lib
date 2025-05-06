@@ -44,8 +44,10 @@ impl DrawMethod for ScribbleMethod {
     /// - An error explaining why the drawing instructions could not be generated
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<(Vec<u8>, f64, f64), String> {
+
+        let relaxation_coefficient = parameters.relaxation_tendency as f32 / 100.;
         
-        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, parameters.relaxation_tendency) {
+        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, relaxation_coefficient) {
             Ok(val) => val,
             Err(err_str) => return Err(err_str),
         };
@@ -94,7 +96,7 @@ impl DrawMethod for ScribbleMethod {
 pub struct ScribbleParameters {
     num_stipples: usize,
     num_iterations: usize,
-    relaxation_tendency: f32,
+    relaxation_tendency: u8,
     scribble_size: usize,
     vertical_offset: f32,
 }
