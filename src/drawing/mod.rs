@@ -13,6 +13,7 @@ pub mod util;
 pub mod lines;
 pub mod cascade;
 pub mod scribble;
+pub mod bubbles;
 pub mod islands;
 pub mod dunes;
 
