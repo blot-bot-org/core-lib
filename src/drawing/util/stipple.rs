@@ -36,8 +36,8 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
     let mut rng = rand::rng();
 
     while points_placed < num_points {
-        let rand_x = rng.random::<f32>() * 1000.;
-        let rand_y = rng.random::<f32>() * 1000.;
+        let rand_x = rng.random::<f32>() * input_image.width() as f32;
+        let rand_y = rng.random::<f32>() * input_image.height() as f32;
 
         let pixel = input_image.get_pixel(rand_x as u32, rand_y as u32).0;
         if (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3 < ((rng.random::<f32>() * 100. * rng.random::<f32>()) as u32) {
@@ -85,7 +85,7 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
     };
     
     // computes the voronoi diagram
-    let (voronoi_sites, _voronoi_edges, site_vertices) = match get_extended_voronoi(&new_points, &triangles, &edge_triangles) {
+    let (voronoi_sites, _voronoi_edges, site_vertices) = match get_extended_voronoi(&new_points, &triangles, &edge_triangles, (input_image.width() as f32, input_image.height() as f32)) {
         Ok((vs, ve, sv)) => (vs, ve, sv),
         Err(err_str) => return Err(err_str),
     };
@@ -98,14 +98,14 @@ fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Ve
         let mut total_weight = 0.;
 
         for n in neighbours.iter() {
-            let image_x = ((voronoi_sites[*n].x).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
-            let image_y = ((voronoi_sites[*n].y).into_inner().min(*OrderedFloat(1000.)) as u32).min(0);
+            let image_x = ((voronoi_sites[*n].x).into_inner() as u32).min(input_image.width() - 1).max(0);
+            let image_y = ((voronoi_sites[*n].y).into_inner() as u32).min(input_image.height() - 1).max(0);
 
             let pixel = input_image.get_pixel(image_x, image_y);
             let weight = (255. - ((pixel.0[0] as f32 + pixel.0[1] as f32 + pixel.0[2] as f32) / 3.)) / 255.;
 
-            sum_weighted_x += *voronoi_sites[*n].x.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
-            sum_weighted_y += *voronoi_sites[*n].y.min(OrderedFloat(1000.)).max(OrderedFloat(0.)) * weight;
+            sum_weighted_x += *voronoi_sites[*n].x.min(OrderedFloat(input_image.width() as f32)).max(OrderedFloat(0.)) * weight;
+            sum_weighted_y += *voronoi_sites[*n].y.min(OrderedFloat(input_image.height() as f32)).max(OrderedFloat(0.)) * weight;
             total_weight += weight;
         }
 
@@ -320,6 +320,7 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> Result<HashMap<(usize, usi
 /// - `points`: A list of points which form the vertices of the delaunay triangulation
 /// - `triangles`: A list of triangle arrays, which are 3 indices representing point indices
 /// - `edge_triangles`: A HashMap to lookup which edge makes which triangle(s)
+/// - `max_wh`: The width/height to bound the diagram to
 ///
 /// # Returns:
 /// - A vector of the voronoi diagram's indices
@@ -328,7 +329,7 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> Result<HashMap<(usize, usi
 ///   corresponding indices of the point vector, which form the polygon of the voronoi cell
 /// - An error as an owned string, explaining the error
 ///
-fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_triangles: &HashMap<(usize, usize), (usize, usize)>) -> Result<(Vec<Point>, Vec<(usize, usize)>, HashMap<usize, Vec<usize>>), String> {
+fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_triangles: &HashMap<(usize, usize), (usize, usize)>, max_wh: (f32, f32)) -> Result<(Vec<Point>, Vec<(usize, usize)>, HashMap<usize, Vec<usize>>), String> {
     // vector, the index of the site point corresponds to the index of the triangle in `triangles`
     let mut voronoi_sites: Vec<Point> = Vec::with_capacity(triangles.len());
     voronoi_sites.extend(std::iter::repeat(Point { x: OrderedFloat(0.), y: OrderedFloat(0.) }).take(triangles.len()));
@@ -422,7 +423,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
 
         let normalised_vector = (vector.0 / normalisation_denominator, vector.1 / normalisation_denominator);
         // DIMENSION REF!
-        let mut scalar = ((1000_f32).powi(2)).sqrt() * 2.; // 10 * dimension
+        let mut scalar = ((max_wh.0.max(max_wh.1)).powi(2)).sqrt() * 2.; // 10 * dimension
 
         let positive_dot = (normalised_vector.0 * (voronoi_sites[*t0].x - hull_centroid.x).into_inner()) + (normalised_vector.1 * (voronoi_sites[*t0].y - hull_centroid.y).into_inner());
         if positive_dot < 0. { // pointing towards the mesh
@@ -468,14 +469,14 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
     // stores the edge index -> the trimmed point
     let mut intersection_points: Vec<(usize, Point)> = vec![];
     let mut dead_site_points: Vec<usize> = vec![];
-    // DIMENSION REF!
     let bounds = [
         Point { x: OrderedFloat(0.), y: OrderedFloat(0.) },
-        Point { x: OrderedFloat(1000.), y: OrderedFloat(0.) },
-        Point { x: OrderedFloat(1000.), y: OrderedFloat(1000.) },
-        Point { x: OrderedFloat(0.), y: OrderedFloat(1000.) }
+        Point { x: OrderedFloat(max_wh.0), y: OrderedFloat(0.) },
+        Point { x: OrderedFloat(max_wh.0), y: OrderedFloat(max_wh.1) },
+        Point { x: OrderedFloat(0.), y: OrderedFloat(max_wh.1) }
     ];
 
+    // first we calculate the intersections
     for i in 0..4 {
         let mut local_intersection_points: Vec<(usize, Point)> = vec![];
 
@@ -488,7 +489,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         }
 
         local_intersection_points.sort_by_key(|o| if i % 2 == 0 { o.1.x } else { o.1.y });
-        if bound_p0.y == 1000. {
+        if bound_p0.y == max_wh.1 {
             local_intersection_points.reverse();
         }
 
@@ -498,6 +499,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
     let mut last_point_idx: Option<usize> = None;
     let mut first_index = 0_usize; // used for the final join, to cycle it
 
+    // now we go through the intersections and connect the points
     for intersection_idx in 0..intersection_points.len() {
         let (edge_index, point) = intersection_points[intersection_idx];
 
@@ -508,13 +510,13 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         // -> `voronoi_edges[index].1` contains the pointer to the illegal vertex
         // so loop through each site, if any reference to old vertices, update it
         for (_site_index, vertices) in site_vertices.iter_mut() {
-            if voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() < 0. {
+            if voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() > max_wh.0 || voronoi_sites[voronoi_edges[edge_index].0].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() > max_wh.1 || voronoi_sites[voronoi_edges[edge_index].0].y.into_inner() < 0. {
                 if let Some(idx) = vertices.iter().position(|&p0| p0 == voronoi_edges[edge_index].0) {
                     let _ = vertices.remove(idx);
                     vertices.push(new_site_point_idx);
                 }
             }
-            if voronoi_sites[voronoi_edges[edge_index].1].x.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].1].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].1].y.into_inner() > 1000. || voronoi_sites[voronoi_edges[edge_index].1].y.into_inner() < 0. {
+            if voronoi_sites[voronoi_edges[edge_index].1].x.into_inner() > max_wh.0 || voronoi_sites[voronoi_edges[edge_index].1].x.into_inner() < 0. || voronoi_sites[voronoi_edges[edge_index].1].y.into_inner() > max_wh.1 || voronoi_sites[voronoi_edges[edge_index].1].y.into_inner() < 0. {
                 if let Some(idx) = vertices.iter().position(|&p0| p0 == voronoi_edges[edge_index].1) {
                     let _ = vertices.remove(idx);
                     vertices.push(new_site_point_idx);
@@ -525,7 +527,7 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
 
         let first_point = voronoi_sites[voronoi_edges[edge_index].0]; // get the first point of the edge
         // DIMENSION REF!
-        if first_point.x.into_inner() > 1000. || first_point.x.into_inner() < 0. || first_point.y.into_inner() > 1000. || first_point.y.into_inner() < 0. {
+        if first_point.x.into_inner() > max_wh.0 || first_point.x.into_inner() < 0. || first_point.y.into_inner() > max_wh.1 || first_point.y.into_inner() < 0. {
             dead_site_points.push(voronoi_edges[edge_index].0);
             voronoi_edges[edge_index] = (new_site_point_idx, voronoi_edges[edge_index].1);
         } else {
