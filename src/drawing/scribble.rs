@@ -1,6 +1,7 @@
 
 use crate::drawing::{DrawMethod, DrawParameters};
 use crate::hardware::PhysicalDimensions;
+use ordered_float::OrderedFloat;
 use serde::{Serialize, Deserialize};
 use crate::drawing::DrawSurface;
 use crate::drawing::util::*;
@@ -47,21 +48,25 @@ impl DrawMethod for ScribbleMethod {
 
         let relaxation_coefficient = parameters.relaxation_tendency as f32 / 100.;
         
-        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, relaxation_coefficient) {
+        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, relaxation_coefficient, parameters.brightness_threshold) {
             Ok(val) => val,
             Err(err_str) => return Err(err_str),
         };
-
         let tour = stipple::nearest_neighbour_tour(&stippled_points);
+
+        let max_x = stippled_points.iter().max_by_key(|p| p.x).unwrap().x.into_inner();
+        let max_y = stippled_points.iter().max_by_key(|p| p.y).unwrap().y.into_inner();
+
+        let biggest_divisor = 1. / (parameters.width / max_x).min(parameters.height / max_y);
 
         let radius_divisor = ((100 - (parameters.scribble_size)) as f32 / 100.) * 5.;
 
         let mut surface = DrawSurface::new(physical_dimensions);
         for t in tour.windows(2) {
-            let scaled_x = stippled_points[t[0]].x / 5.;
-            let scaled_y = stippled_points[t[0]].y / 5.;
+            let scaled_x = stippled_points[t[0]].x.into_inner() / biggest_divisor;
+            let scaled_y = stippled_points[t[0]].y.into_inner() / biggest_divisor;
             
-            let dist_to_next = ((stippled_points[t[1]].x / 5. - stippled_points[t[0]].x / 5.).powi(2) + (stippled_points[t[1]].y / 5. - stippled_points[t[0]].y / 5.).powi(2)).sqrt();
+            let dist_to_next = ((stippled_points[t[1]].x / biggest_divisor - stippled_points[t[0]].x / biggest_divisor).powi(2) + (stippled_points[t[1]].y / biggest_divisor - stippled_points[t[0]].y / biggest_divisor).powi(2)).sqrt();
 
             let radius = dist_to_next / radius_divisor;
             let iterations: usize = ((radius * 4.) as usize).max(6);
@@ -72,7 +77,7 @@ impl DrawMethod for ScribbleMethod {
                 // let lerped = lerp_xy(scaled_x + offset_x, stippled_points[t[1]].x / 5., scaled_y + offset_y, stippled_points[t[1]].y / 5., (i as f32 / iterations as f32));
 
                 // surface.sample_xy((scaled_x + offset_x + lerped.0).into_inner() as f64, (scaled_y + offset_y + lerped.1).into_inner() as f64);
-                if let Err(err_str) = surface.sample_xy((scaled_x + offset_x).into_inner() as f64, (scaled_y + offset_y + parameters.vertical_offset).into_inner() as f64) {
+                if let Err(err_str) = surface.sample_xy((scaled_x + offset_x + parameters.horizontal_offset) as f64, (scaled_y + offset_y + parameters.vertical_offset) as f64) {
                     return Err(err_str);
                 };
             }
@@ -94,11 +99,17 @@ impl DrawMethod for ScribbleMethod {
 ///
 #[derive(Serialize, Deserialize)]
 pub struct ScribbleParameters {
+    width: f32,
+    height: f32,
+    horizontal_offset: f32,
+    vertical_offset: f32,
+
+    brightness_threshold: u8,
+
     num_stipples: usize,
     num_iterations: usize,
     relaxation_tendency: u8,
     scribble_size: usize,
-    vertical_offset: f32,
 }
 
 impl DrawParameters for ScribbleParameters {}

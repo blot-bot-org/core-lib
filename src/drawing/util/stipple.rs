@@ -18,7 +18,7 @@ use std::collections::HashMap;
 /// # Returns
 /// - A vector containing the positions of the stippled points
 ///
-pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32) -> Result<Vec<Point>, String> {
+pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32, brightness_threshold: u8) -> Result<Vec<Point>, String> {
 
     // open input image
     let input_image = match ImageReader::open(file_path) {
@@ -40,7 +40,7 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
         let rand_y = rng.random::<f32>() * input_image.height() as f32;
 
         let pixel = input_image.get_pixel(rand_x as u32, rand_y as u32).0;
-        if (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3 < ((rng.random::<f32>() * 100. * rng.random::<f32>()) as u32) {
+        if (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3 < ((rng.random::<f32>() * brightness_threshold as f32 * rng.random::<f32>()) as u32) {
             points.push(Point { x: OrderedFloat(rand_x), y: OrderedFloat(rand_y) });
             points_placed += 1;
         }
