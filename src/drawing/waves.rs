@@ -64,6 +64,9 @@ impl DrawMethod for WavesMethod {
         let mm_per_x_sample = total_width / parameters.horizontal_samples as f64;
         let wave_multiplier = parameters.wave_amplifier / 10.;
 
+        let true_horizontal_margin = (*physical_dimensions.page_width() - total_width) / 2.;
+        let true_vertical_margin = (*physical_dimensions.page_height() - total_height) / 2.;
+
         // we will approximate the image to the dedicated size + make it greyscale
         let mut processed_img = GrayImage::new(parameters.horizontal_samples as u32, parameters.num_waves as u32);
         for x in 0..parameters.horizontal_samples {
@@ -85,12 +88,12 @@ impl DrawMethod for WavesMethod {
                 let iterations = 10;
                 let step_x = mm_per_x_sample / iterations as f64;
                 let start_x = match is_reversed {
-                    false => parameters.horizontal_margin as f64 + sample_idx as f64 * mm_per_x_sample,
-                    true => physical_dimensions.page_width() - parameters.horizontal_margin as f64 - (sample_idx as f64 * mm_per_x_sample),
+                    false => true_horizontal_margin + sample_idx as f64 * mm_per_x_sample,
+                    true => *physical_dimensions.page_width() as f64 - true_horizontal_margin - (sample_idx as f64 * mm_per_x_sample),
                 };
-                let start_y = parameters.vertical_margin as f64 + row_idx as f64 * height_per_wave + 0.5 * height_per_wave;
+                let start_y = true_vertical_margin as f64 + row_idx as f64 * height_per_wave + 0.5 * height_per_wave;
 
-                let intensity = (1. - (processed_img.get_pixel(if is_reversed { (parameters.horizontal_samples - sample_idx - 1) } else { sample_idx } as u32, row_idx as u32).0[0] as f64) / 255.);
+                let intensity = 1. - (processed_img.get_pixel(if is_reversed { (parameters.horizontal_samples - sample_idx - 1) } else { sample_idx } as u32, row_idx as u32).0[0] as f64) / 255.;
 
                 for i in 0..iterations {
                     if is_reversed {
