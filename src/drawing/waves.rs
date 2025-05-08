@@ -43,7 +43,11 @@ impl DrawMethod for WavesMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &WavesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        let input_image = match ImageReader::open("./input.jpeg") {
+        if(parameters.image_path.is_empty()) {
+            return Err("Select an input image".to_owned());
+        }
+
+        let input_image = match ImageReader::open(parameters.image_path.as_str()) {
             Ok(img) => {
                 img.decode().unwrap().into_rgb8()
             },
@@ -121,6 +125,8 @@ impl DrawMethod for WavesMethod {
 ///
 #[derive(Serialize, Deserialize)]
 pub struct WavesParameters {
+    pub image_path: String,
+    
     pub num_waves: usize,
     pub horizontal_samples: usize,
 

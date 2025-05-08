@@ -1,7 +1,6 @@
 
 use crate::drawing::{DrawMethod, DrawParameters};
 use crate::hardware::PhysicalDimensions;
-use ordered_float::OrderedFloat;
 use serde::{Serialize, Deserialize};
 use crate::drawing::DrawSurface;
 use crate::drawing::util::*;
@@ -45,10 +44,14 @@ impl DrawMethod for ScribbleMethod {
     /// - An error explaining why the drawing instructions could not be generated
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<(Vec<u8>, f64, f64), String> {
+        
+        if(parameters.image_path.is_empty()) {
+            return Err("Select an input image".to_owned());
+        }
 
         let relaxation_coefficient = parameters.relaxation_tendency as f32 / 100.;
         
-        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points("./input.jpeg", parameters.num_stipples, parameters.num_iterations, relaxation_coefficient, parameters.brightness_threshold) {
+        let stippled_points: Vec<stipple_structures::Point> = match stipple::stipple_points(parameters.image_path.as_str(), parameters.num_stipples, parameters.num_iterations, relaxation_coefficient, parameters.brightness_threshold) {
             Ok(val) => val,
             Err(err_str) => return Err(err_str),
         };
@@ -99,6 +102,8 @@ impl DrawMethod for ScribbleMethod {
 ///
 #[derive(Serialize, Deserialize)]
 pub struct ScribbleParameters {
+    image_path: String,
+
     width: f32,
     height: f32,
     horizontal_offset: f32,
