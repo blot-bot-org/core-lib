@@ -61,6 +61,7 @@ pub struct DrawSurface<'pd> {
     belts: Belts,
 }
 
+#[allow(dead_code)]
 impl<'pd> DrawSurface<'pd> {
     /// 
     /// Creates a new drawing surface, intialising belts to the init_x, init_y length.

@@ -77,7 +77,7 @@ impl DrawMethod for WavesMethod {
             for y in 0..parameters.num_waves {
 
                 let pix = input_image.get_pixel(((input_image.width() as f64 * (x as f64 / parameters.horizontal_samples as f64)).round() as u32).min(input_image.width() - 1) as u32, (((input_image.height() as f64 * (y as f64 / parameters.num_waves as f64)).round() as u32).min(input_image.height() - 1)) as u32).0;
-                let mean = (((pix[0] as f32 * 0.299 + pix[1] as f32 * 0.587 + pix[2] as f32 * 0.114)).round() as u8);
+                let mean = ((pix[0] as f32 * 0.299 + pix[1] as f32 * 0.587 + pix[2] as f32 * 0.114)).round() as u8;
                 *processed_img.get_pixel_mut(x as u32, y as u32) = Luma([mean as u8]);
 
             }
@@ -96,7 +96,7 @@ impl DrawMethod for WavesMethod {
                 };
                 let start_y = true_vertical_margin as f64 + row_idx as f64 * height_per_wave + 0.5 * height_per_wave;
 
-                let intensity = 1. - (processed_img.get_pixel(if is_reversed { (parameters.horizontal_samples - sample_idx - 1) } else { sample_idx } as u32, row_idx as u32).0[0] as f64) / 255.;
+                let intensity = 1. - (processed_img.get_pixel(if is_reversed { parameters.horizontal_samples - sample_idx - 1 } else { sample_idx } as u32, row_idx as u32).0[0] as f64) / 255.;
 
                 for i in 0..iterations {
                     if is_reversed {

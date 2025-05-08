@@ -102,7 +102,7 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
 /// # Returns:
 /// - A `Duration` of the time taken to draw the drawing
 ///
-pub fn calculate_draw_time(ins_bytes: &[u8], max_motor_speed: u32, min_pulse_width: u32) -> Duration {
+pub fn calculate_draw_time(ins_bytes: &[u8], max_motor_speed: u32, _min_pulse_width: u32) -> Duration {
     let mut total_secs: f64 = 0.;
     let mut s_idx = 0;
     let mut total_its: usize = 0;
