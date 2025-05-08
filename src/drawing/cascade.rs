@@ -45,7 +45,6 @@ impl DrawMethod for CascadeMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &CascadeParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-
         // calculate constants
         let vertical_mm_per_box = (physical_dimensions.page_height() - 2. * parameters.vertical_margin) / parameters.boxes_vertical as f64;
         let horizontal_mm_per_box = (physical_dimensions.page_width() - 2. * parameters.horizontal_margin) / parameters.boxes_horizontal as f64;

@@ -45,7 +45,7 @@ impl DrawMethod for ScribbleMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &ScribbleParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        if(parameters.image_path.is_empty()) {
+        if parameters.image_path.is_empty() {
             return Err("Select an input image".to_owned());
         }
 

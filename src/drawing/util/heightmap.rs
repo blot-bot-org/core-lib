@@ -33,6 +33,7 @@ fn gen_heightmap(seed: u32, width: usize, height: usize, layer_height: f64, base
 
 /// 
 /// Generates "terrain", an alias for 3 layers of perlin noise.
+/// In short, it layers the `gen_heightmap` function a couple of times.
 ///
 /// # Parameters:
 /// - `seed`: A number to seed the perlin noise
@@ -44,7 +45,7 @@ fn gen_heightmap(seed: u32, width: usize, height: usize, layer_height: f64, base
 /// - `hs` + `ha`: Perlin noise layer 3's size and amplitude
 ///
 /// # Returns:
-/// - A 2D vector, with f64 values, in the form Row<Column<f64>>
+/// - A 2D vector, with u8 values, in the form Row<Column<u8>>
 ///
 pub fn gen_terrain(seed: u32, width: usize, height: usize, layer_height: f64, bs: f64, ba: f64, ms: f64, ma: f64, hs: f64, ha: f64) -> Vec<Vec<u8>> {
     let mut values: Vec<Vec<u8>> = Vec::new();

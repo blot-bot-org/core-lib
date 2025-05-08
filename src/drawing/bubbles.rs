@@ -45,7 +45,7 @@ impl DrawMethod for BubblesMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &BubblesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        if(parameters.image_path.is_empty()) {
+        if parameters.image_path.is_empty() {
             return Err("Select an input image".to_owned());
         }
 
@@ -97,10 +97,14 @@ impl DrawMethod for BubblesMethod {
 /// A set of parameters to instruct the generation of the draw calls.
 ///
 /// # Fields:
+/// - `image_path`: The path of the image to stipple
+/// - `width`: The maximum width of the drawing
+/// - `height`: The maximum height of the drawing
+/// - `horizontal_offset`: The horizontal offset of the drawing
+/// - `vertical_offset`: The vertical offset of the drawing
 /// - `num_stipples`: The desired number of stipple points
 /// - `num_iterations`: The desired number of iterations of Lloyd's relaxation
 /// - `relaxation_tendency`: A float to represent a scalar multiplier for the relaxation tendency
-/// - `vertical_offset`: A y-offset of the entire drawing
 ///
 #[derive(Serialize, Deserialize)]
 pub struct BubblesParameters {

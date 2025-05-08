@@ -10,18 +10,8 @@ use crate::client::calculate_draw_time;
 use super::error::ClientError;
 use super::read_header;
 
-/// 
-/// A representation of a connection to the drawing machine.
-/// Typically in frontends, to be usable, this should be wrapped in an Arc<Mutex<...>> so it is
-/// thread-safe, as in this manner you can send pause requests whilst blocking for incoming bytes.
 ///
-/// # Fields:
-/// - `socket`: The TCP socket connection to the machine
-/// - `awaiting_pause`: Whether a client has sent a pause request, and is awaiting a response
-/// - `drawing_paused`: Whether the machine recognises itself as paused
-/// - `machine_configuration`: The configuration of the machine
-/// - `terminating_instruction_idx`: If a drawing is stopped for any reason, this holds the
-/// instruction stopped at. This includes stopping when a drawing has finished
+/// Empty struct for method implementation.
 ///
 pub struct ClientState {}
 
@@ -29,16 +19,16 @@ impl ClientState {
 
 
     ///
-    /// Creates a new TcpStream or an error. The TcpStream can be separated into the read/write halves in an implementation.
-    /// This function also initialises a drawing with greeting bytes, if a connection is
-    /// established.
+    /// Creates a new TcpStream along with the machine configuration or an error.
+    /// The TcpStream can be separated into the read/write halves in an implementation.
+    /// This function also initialises a drawing with greeting bytes, if a connection is established.
     ///
     /// # Parameters:
     /// - `addr`: The IP address of the machine
     /// - `port`: The port address of the machine
     ///
     /// # Returns:
-    /// - An owned TcpStream
+    /// - An owned TcpStream, and the machines configuration
     /// - A `ClientError` if the connection could not be established
     ///
     pub async fn new(addr: &str, port: u16) -> Result<(TcpStream, MachineConfiguration), ClientError> {
@@ -131,7 +121,7 @@ impl ClientState {
     ///
     /// # Parameters:
     /// - `reader`: A mutex-locked read half of a TcpStream
-    /// - `writer`: A reference to the guarded TcpStream write half
+    /// - `write_ref`: A reference to the guarded TcpStream write half
     /// - `buf_idx`: A usize identifying the ins_set bound to send to the machine
     /// - `ins_set`: The drawing instruction set
     /// - `emit`: A callback function to emit updates from the function
@@ -140,19 +130,10 @@ impl ClientState {
     where
         F: FnMut(String) + Send + 'static,
     {
-        // println!("starting listen loop");
-    
+        // continuous blocking loop
         loop {
             let mut incoming_buf: [u8; 255] = [0; 255];
             let _ = reader.read(&mut incoming_buf).await; // will block
-
-            /*
-            println!("Received something...");
-            for b in 0..32 {
-                print!("0x{:02x} ", incoming_buf[b]);
-            }
-            println!();
-            */
 
             if *incoming_buf.get(0).unwrap() == 0x03 {
                 let mut next_buf_lock = buf_idx.lock().await;
@@ -224,7 +205,4 @@ pub struct MachineConfiguration {
     pub max_motor_speed: u32,
     pub min_pulse_width: u32,
 }
-
-
-
 

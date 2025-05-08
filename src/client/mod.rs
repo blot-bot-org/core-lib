@@ -1,3 +1,7 @@
+//!
+//! Firmware-interfacing functions and helpers
+//!
+
 use std::time::Duration;
 use std::{io::Read, net::TcpStream};
 use std::io::prelude::*;
@@ -93,6 +97,7 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
 /// # Parameters:
 /// - `ins_bytes`: A valid instruction set as a slice of bytes
 /// - `max_motor_speed`: The motor steps per second
+/// - `min_pulse_width`: The minimum pulse width of a motor
 ///
 /// # Returns:
 /// - A `Duration` of the time taken to draw the drawing
@@ -179,8 +184,7 @@ fn bytes_to_u32(array: &[u8], index: usize) -> u32 {
 /// the machine
 ///
 fn read_header(header: &[u8; 255]) -> (u16, u32, u32, u32) {
-    // ignore first byte.
-    
+    // ignore first byte, its the header
     (
         bytes_to_u16(header, 1),
         // start from ins here, 4 bytes, ignoring it for now

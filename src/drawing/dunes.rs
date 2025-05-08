@@ -46,7 +46,6 @@ impl DrawMethod for DunesMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &DunesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        
         let vertical_offset = (physical_dimensions.page_height() - parameters.height as f64) / 2. + parameters.vertical_offset as f64;
         let horizontal_offset = (physical_dimensions.page_width() - parameters.width as f64) / 2.;
 
@@ -95,7 +94,7 @@ impl DrawMethod for DunesMethod {
             }
         }
 
-        println!("{}, {}", surface.first_sample_x.unwrap(), surface.first_sample_y.unwrap());
+
         Ok((surface.current_ins, surface.first_sample_x.unwrap_or(0.), surface.first_sample_y.unwrap_or(0.)))
     }
 }
@@ -106,13 +105,11 @@ impl DrawMethod for DunesMethod {
 ///
 /// # Fields:
 /// - `seed`: A seed to use for the random perlin noise
-///
 /// - `layers`: The number of vertical layers
 /// - `sample_per_mm`: The number of samples of perlin noise per horizontal millimetre
 /// - `width`: Total width of the drawing, in millimetres
 /// - `height`: Total height of the drawing, in millimetres
 /// - `vertical_offset`: A y-offset for the entire drawing, in millimetres
-///
 /// - `base_size`: The size of the base perlin noise
 /// - `base_amplitude`: The amplitude of the mid perlin noise
 /// - `mid_size`: The size of the mid perlin noise

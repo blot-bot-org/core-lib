@@ -48,7 +48,6 @@ impl DrawMethod for IslandsMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &IslandsParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        
         let vertical_offset = (physical_dimensions.page_height() - parameters.height as f64) / 2. + parameters.vertical_offset as f64;
         let horizontal_offset = (physical_dimensions.page_width() - parameters.width as f64) / 2.;
 
@@ -107,13 +106,11 @@ impl DrawMethod for IslandsMethod {
 ///
 /// # Fields:
 /// - `seed`: A seed to use for the random perlin noise
-///
 /// - `layers`: The number of vertical layers
 /// - `sample_per_mm`: The number of samples of perlin noise per horizontal millimetre
 /// - `width`: Total width of the drawing, in millimetres
 /// - `height`: Total height of the drawing, in millimetres
 /// - `vertical_offset`: A y-offset for the entire drawing, in millimetres
-///
 /// - `ocean_height`: The supposed "ocean-height" around the islands
 /// - `base_size`: The size of the base perlin noise
 /// - `base_amplitude`: The amplitude of the mid perlin noise

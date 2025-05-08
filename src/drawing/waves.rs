@@ -43,7 +43,7 @@ impl DrawMethod for WavesMethod {
     ///
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &WavesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
-        if(parameters.image_path.is_empty()) {
+        if parameters.image_path.is_empty() {
             return Err("Select an input image".to_owned());
         }
 
@@ -83,8 +83,7 @@ impl DrawMethod for WavesMethod {
             }
         }
 
-        // processed_img.save("hi.jpg");
-
+        // finally we commit the processed image to the page
         for row_idx in 0..parameters.num_waves {
             for sample_idx in 0..parameters.horizontal_samples {
                 let is_reversed = row_idx % 2 == 1;
@@ -120,8 +119,12 @@ impl DrawMethod for WavesMethod {
 /// A set of parameters to instruct the generation of the draw calls.
 ///
 /// # Fields:
-/// - `num_waves`: The number of vertical lines to draw
+/// - `image_path`: The path of the image to stipple
+/// - `num_waves`: The number of sine waves to layer
+/// - `horizontal_samples`: The number of horizontal samples (individual waves) taken
 /// - `horizontal_margin`: The horizontal margin of the drawing, in millimetres
+/// - `vertical_margin`: The vertical margin of the drawing, in millimetres
+/// - `wave_amplifier`: A coefficient for the height of the sine waves
 ///
 #[derive(Serialize, Deserialize)]
 pub struct WavesParameters {

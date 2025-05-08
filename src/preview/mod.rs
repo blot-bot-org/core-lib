@@ -35,6 +35,7 @@ pub fn generate_preview(init_xy: (f64, f64), physical_dim: &PhysicalDimensions, 
         belts.move_by_steps(*ld, -rd);
         let (x, y) = belts.get_as_cartesian();
 
+        // an error has occured, so we will say that
         if x.is_nan() || y.is_nan() && !last_xy.0.is_nan() && !last_xy.1.is_nan() {
             println!("Error generating instructions - sample point #{} (zero-indexed) steps {} {} to point from x:{} y:{} to x:{} y:{}", index, *ld, -rd, last_xy.0, last_xy.1, x, y);
             return Some(
@@ -49,7 +50,6 @@ pub fn generate_preview(init_xy: (f64, f64), physical_dim: &PhysicalDimensions, 
                 }
             );
         }
-
 
         preview_canvas.line(last_xy.0 - *physical_dim.page_horizontal_offset(), last_xy.1 - *physical_dim.page_vertical_offset(), x - *physical_dim.page_horizontal_offset(), y - *physical_dim.page_vertical_offset());
         last_xy = (x, y);

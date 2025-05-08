@@ -14,9 +14,12 @@ use std::collections::HashMap;
 /// - `file_path`: The path of the input image file
 /// - `num_points`: The number of points to stipple
 /// - `iterations`: The number of iterations of Lloyd's relaxation to perform
+/// - `relaxation_tendency`: The coefficient for Lloyd's relaxation
+/// - `brightness_threshold`: The luma value which below pixels are seeded
 ///
 /// # Returns
 /// - A vector containing the positions of the stippled points
+/// - An error explaining why the stipple failed
 ///
 pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, relaxation_tendency: f32, brightness_threshold: u8) -> Result<Vec<Point>, String> {
 
@@ -69,7 +72,7 @@ pub fn stipple_points(file_path: &str, num_points: usize, iterations: usize, rel
 ///
 /// # Returns:
 /// - Void if an iteration suceeded
-/// - An error as an owned string, explaining the error
+/// - An error as an owned string, explaining why the function failed
 ///
 fn iterate(points: &mut Vec<Point>, input_image: &ImageBuffer<image::Rgb<u8>, Vec<u8>>, relaxation_tendency: f32) -> Result<(), String> {
     
@@ -548,19 +551,6 @@ fn get_extended_voronoi(points: &Vec<Point>, triangles: &Vec<[usize; 3]>, edge_t
         return Err("There was no last_point_idx when bounding voronoi diagram. Was a diagram created?".to_owned());
     }
     
-    // DEBUG
-    /*
-    for (site, neighbours) in &site_vertices {
-        println!("{:?}", points[*site]);
-        for n in neighbours.iter() {
-            if voronoi_sites[*n].x.into_inner() > 1000. || voronoi_sites[*n].x.into_inner() < 0. || voronoi_sites[*n].y.into_inner() > 1000. || voronoi_sites[*n].y.into_inner() < 0. {
-                println!("neighbour: {:?}", voronoi_sites[*n]);
-            }
-        }
-        println!("\n");
-    }
-    */
-
     Ok((voronoi_sites, voronoi_edges, site_vertices))
 }
 

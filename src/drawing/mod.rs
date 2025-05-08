@@ -24,7 +24,7 @@ pub mod waves;
 /// # Functions:
 /// - `get_id`: Should return the unique ID of a drawing method
 /// - `get_formatted_name`: Should return the formatted name of a drawing method
-/// - `gen_instructions`: Should return the drawing instruction bytes as a vector, or an error. Takes the page parameters.
+/// - `gen_instructions`: Should return the drawing instruction bytes as a vector and pen start position, or an error. Takes the page parameters.
 ///
 pub trait DrawMethod {
     type DrawParameters;
@@ -149,6 +149,9 @@ impl<'pd> DrawSurface<'pd> {
     /// Pops the last draw call off the instruction list, and reverts the belts to their old
     /// position accordingly.
     ///
+    /// # Returns:
+    /// - An error as an owned string, if the function failed
+    ///
     fn pop_sample(&mut self) -> Result<(), String> {
         if self.current_ins.len() < 5 {
             return Err("Could not pop instructions, as there were no instructions in the vector.".to_owned());
@@ -195,8 +198,9 @@ impl<'pd> DrawSurface<'pd> {
     ///
     pub fn pen_to_start_ins(physical_dimensions: &PhysicalDimensions, init_x: f64, init_y: f64) -> Vec<u8> {
         let mut ds = DrawSurface::new(physical_dimensions);
-        ds.sample_xy(0., 0.); // init at to top/left of page
-        ds.sample_xy(init_x, init_y); // move to start pos
+
+        ds.sample_xy(0., 0.).unwrap(); // init at to top/left of page
+        ds.sample_xy(init_x, init_y).unwrap(); // move to start pos
         
         ds.current_ins
     }
