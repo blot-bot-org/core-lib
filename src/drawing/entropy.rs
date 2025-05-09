@@ -48,6 +48,8 @@ impl DrawMethod for EntropyMethod {
         let center_x = physical_dimensions.page_width() / 2.;
         let center_y = physical_dimensions.page_height() / 2.;
 
+        let mut swirl_center: Option<(f64, f64)> = None;
+
         let angle_step_rad = (360. / parameters.cycle_density as f64) * (std::f64::consts::PI / 180.);
         let cycle_distance = parameters.cycle_distance as f64 / 100.;
         let swirl_factor = parameters.swirl_factor / 100.;
@@ -62,8 +64,14 @@ impl DrawMethod for EntropyMethod {
             let default_y = center_y + radius * theta.sin();
             
             let (dx, dy) = get_perlin_d(default_x, default_y, &perlin, parameters);
-            let (sx, sy) = swirl_transform(default_x + dx, default_y + dy, center_x, center_y, swirl_factor, parameters.swirl_decay);
+            
+            if swirl_center.is_none() { // first iteration
+                swirl_center = Some((default_x + dx, default_y + dy));
+                surface.sample_xy(default_x + dx + parameters.horizontal_offset, default_y + dy + parameters.vertical_offset).unwrap();
+                continue;
+            } 
 
+            let (sx, sy) = swirl_transform(default_x + dx, default_y + dy, swirl_center.unwrap().0, swirl_center.unwrap().1, swirl_factor, parameters.swirl_decay);
             surface.sample_xy(sx + parameters.horizontal_offset, sy + parameters.vertical_offset).unwrap();
         }
         
