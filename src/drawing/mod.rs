@@ -17,6 +17,7 @@ pub mod bubbles;
 pub mod islands;
 pub mod dunes;
 pub mod waves;
+pub mod entropy;
 
 ///
 /// The trait for all drawing methods to implement.
