@@ -31,7 +31,8 @@ impl DrawMethod for EntropyMethod {
     }
 
     ///
-    /// TODO.
+    /// This drawing method creates an initial spiral, which is then manipulated by 3 layers of
+    /// perlin noise to create abstract patterns.
     ///
     /// # Parameters:
     /// - `physical_dimensions`: A physical dimension object, including paper width / height

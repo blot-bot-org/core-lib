@@ -18,6 +18,7 @@ pub mod islands;
 pub mod dunes;
 pub mod waves;
 pub mod entropy;
+pub mod links;
 
 ///
 /// The trait for all drawing methods to implement.
