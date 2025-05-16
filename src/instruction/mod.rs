@@ -201,6 +201,8 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
             break;
         }
 
+        println!("{:?}", ins_bytes.split_at_checked(c_idx).unwrap());
+
         if ins_bytes[c_idx] == 0x0C { // end instruction
             c_idx += 1; // skip 0x0c, check next ins
             continue;
@@ -209,8 +211,6 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
             if ins_bytes[c_idx] == 0x0C {
                 c_idx += 1;
                 continue
-            } else {
-        return Some(InstructionError::IncompleteInstructions(ins_bytes[c_idx]));
             }
         } else if ins_bytes[c_idx] == 0x0B { // pen down
             c_idx += 1;
@@ -218,9 +218,11 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
                 c_idx += 1;
                 continue;
             }
+        } else {
+            // terminator byte wasnt 0x0c, or technically if extra bytes weren't pen up/down
+            return Some(InstructionError::IncompleteInstructions(ins_bytes[c_idx]));
         }
 
-        // terminator byte wasnt 0x0c, or technically if extra bytes weren't pen up/down
         return Some(InstructionError::IncompleteInstructions(ins_bytes[c_idx]));
     }
 
@@ -278,7 +280,7 @@ mod tests {
 
     #[test]
     fn invalid_instruction_stream_indexed_oub() {
-        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0A\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 20).is_ok());
+        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0A\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 20).is_err());
     }
 
     #[test]
@@ -295,7 +297,7 @@ mod tests {
 
     #[test]
     fn validate_invalid_stream() {
-        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
+        assert!(InstructionSet::new("\x0A\x0B\x2A\x0C\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).is_err());
     }
 
     #[test]
@@ -310,6 +312,6 @@ mod tests {
 
     #[test]
     fn validate_not_pen_up_down_stream() {
-        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0D\x0C\x2A\x3A\x0C\x0A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
+        assert!(InstructionSet::new("\x0A\x0B\x2A\x0C\x0D\x0C\x2A\x3A\x0C\x0A\x0C".to_owned().into_bytes(), 0., 0.).is_err());
     }
 }
