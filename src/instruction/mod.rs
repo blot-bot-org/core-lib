@@ -194,38 +194,37 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
         return Some(InstructionError::EmptyInstructionSet);
     }
 
-    if ins_bytes.len() % 5 != 0 {
-        return Some(InstructionError::InvalidLength);
-    }
-
-    // step every 5th byte to check its 0x0C
-    for index in (4..ins_bytes.len() - 1).step_by(5) {
-        if *ins_bytes.get(index).expect("Indexed instruction stream for 0x0C") != 0x0C {
-            return Some(InstructionError::IncompleteInstructions(*ins_bytes.last().unwrap()));
-        }
-    }
-
-    None
-
-    /*
-    saved this code, as may be used in future where not every 5th-n byte is 0x0C
-    
-    let mut current_idx = 0;
+    let mut c_idx = 0;
     loop {
-        current_idx += 4;
-
-        // Break if we've looped the vec
-        if current_idx >= ins_bytes.len() {
+        c_idx += 4;
+        if c_idx >= ins_bytes.len() {
             break;
         }
 
-        // If the 5th byte is not an 0x0C it's currently deemed invalid
-        if *ins_bytes.get(current_idx).expect("Indexed instruction stream for 0x0C") != 0x0C {
-            Some(InstructionError::IncompleteInstructions(*ins_bytes.last().unwrap()))
+        if ins_bytes[c_idx] == 0x0C { // end instruction
+            c_idx += 1; // skip 0x0c, check next ins
+            continue;
+        } else if ins_bytes[c_idx] == 0x0A { // pen up
+            c_idx += 1;
+            if ins_bytes[c_idx] == 0x0C {
+                c_idx += 1;
+                continue
+            } else {
+        return Some(InstructionError::IncompleteInstructions(ins_bytes[c_idx]));
+            }
+        } else if ins_bytes[c_idx] == 0x0B { // pen down
+            c_idx += 1;
+            if ins_bytes[c_idx] == 0x0C {
+                c_idx += 1;
+                continue;
+            }
         }
-        current_idx += 1; // like writing `start_idx = end_idx + 1;`
+
+        // terminator byte wasnt 0x0c, or technically if extra bytes weren't pen up/down
+        return Some(InstructionError::IncompleteInstructions(ins_bytes[c_idx]));
     }
-    */
+
+    None
 }
 
 
@@ -278,8 +277,8 @@ mod tests {
     }
 
     #[test]
-    fn valid_instruction_stream_indexed_oub() {
-        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 14).is_err());
+    fn invalid_instruction_stream_indexed_oub() {
+        assert!(InstructionSet::new_from_idx("\x0A\x0B\x2A\x3A\x0A\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0., 20).is_ok());
     }
 
     #[test]
@@ -296,12 +295,21 @@ mod tests {
 
     #[test]
     fn validate_invalid_stream() {
-        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0C\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
     }
 
     #[test]
-    fn validate_incomplete_stream() {
-        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0B\x2A\x3A\x0C\x0A\x0B\x2A\x3A".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
+    fn validate_pen_up_down_stream() {
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0C\x2A\x3A\x0C\x0A\x0B\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_none());
     }
 
+    #[test]
+    fn validate_pen_up_down_stream_2() {
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0A\x0C\x2A\x3A\x0C\x0A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_none());
+    }
+
+    #[test]
+    fn validate_not_pen_up_down_stream() {
+        assert!(is_stream_valid(&InstructionSet::new("\x0A\x0B\x2A\x0C\x0D\x0C\x2A\x3A\x0C\x0A\x0C".to_owned().into_bytes(), 0., 0.).unwrap().get_binary()).is_some());
+    }
 }
