@@ -53,6 +53,8 @@ pub trait DrawParameters: Serialize + for<'d> Deserialize<'d> {}
 /// - `current_ins`: The vector containing the current instructions
 /// - `physical_dimensions`: The physical parameters of the machine
 /// - `belts`: An object representing the belts
+/// - `pen_up`: The current pen state, true if the pen is raised off the paper
+/// - `swap_pen_state`: Whether to change the pen state in the next instruction
 ///
 pub struct DrawSurface<'pd> {
     first_sample_x: Option<f64>,
@@ -61,6 +63,9 @@ pub struct DrawSurface<'pd> {
     current_ins: Vec<u8>,
     physical_dimensions: &'pd PhysicalDimensions,
     belts: Belts,
+
+    pen_up: bool,
+    swap_pen_state: bool,
 }
 
 #[allow(dead_code)]
@@ -77,7 +82,8 @@ impl<'pd> DrawSurface<'pd> {
     fn new(physical_dimensions: &PhysicalDimensions) -> DrawSurface {
         let belts = Belts::new_by_cartesian(0., 0., 0.);
 
-        DrawSurface { current_ins: Vec::new(), physical_dimensions, belts, first_sample_x: None, first_sample_y: None }
+        // pen is assumed as starting up (for example, as it has to move to the start position)
+        DrawSurface { current_ins: Vec::new(), physical_dimensions, belts, first_sample_x: None, first_sample_y: None, pen_up: true, swap_pen_state: false }
     }
 
     /// 
@@ -142,10 +148,37 @@ impl<'pd> DrawSurface<'pd> {
         self.current_ins.push(left_step_bytes[0]);    
         self.current_ins.push(left_step_bytes[1]);    
         self.current_ins.push(right_step_bytes[0]);    
-        self.current_ins.push(right_step_bytes[1]);    
-        self.current_ins.push(0x0C_u8);
+        self.current_ins.push(right_step_bytes[1]);
+
+        if self.swap_pen_state {
+            if self.pen_up {
+                self.current_ins.push(0x0B);
+                self.pen_up = false;
+            } else {
+                self.current_ins.push(0x0A);
+                self.pen_up = true;
+            }
+            self.swap_pen_state = false;
+        }
+
+        self.current_ins.push(0x0C);
 
         Ok(())
+    }
+
+    ///
+    /// Raises of lowers the pen on the next instruction call.
+    ///
+    /// # Parameters:
+    /// - `pen_up`: true if the pen should raise off the paper
+    ///
+    fn raise_pen(&mut self, raised: bool) {
+        // if the pen is set to the state it is, the call is ignored
+        if self.pen_up == raised {
+            return;
+        }
+        
+        self.swap_pen_state = true;
     }
 
     /// 
