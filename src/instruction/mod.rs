@@ -201,8 +201,6 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
             break;
         }
 
-        println!("{:?}", ins_bytes.split_at_checked(c_idx).unwrap());
-
         if ins_bytes[c_idx] == 0x0C { // end instruction
             c_idx += 1; // skip 0x0c, check next ins
             continue;
