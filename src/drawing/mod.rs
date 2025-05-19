@@ -188,6 +188,7 @@ impl<'pd> DrawSurface<'pd> {
     /// # Returns:
     /// - An error as an owned string, if the function failed
     ///
+    /* nneds adjustment to support pen up / down, but not in use rn
     fn pop_sample(&mut self) -> Result<(), String> {
         if self.current_ins.len() < 5 {
             return Err("Could not pop instructions, as there were no instructions in the vector.".to_owned());
@@ -208,6 +209,7 @@ impl<'pd> DrawSurface<'pd> {
 
         Ok(())
     }
+    */
 
     ///
     /// # Returns:
