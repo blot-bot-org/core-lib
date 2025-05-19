@@ -1,3 +1,4 @@
+use byteorder::ByteOrder;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::sync::Mutex;
 use tokio::net::TcpStream;
@@ -135,6 +136,8 @@ impl ClientState {
             let mut incoming_buf: [u8; 255] = [0; 255];
             let _ = reader.read(&mut incoming_buf).await; // will block
 
+            if *incoming_buf.get(0).unwrap() == 0x02 {}
+
             if *incoming_buf.get(0).unwrap() == 0x03 {
                 let mut next_buf_lock = buf_idx.lock().await;
                 *next_buf_lock += 1;
@@ -164,8 +167,10 @@ impl ClientState {
 
                 let mut write_lock = write_ref.lock().await;
                 let writer = write_lock.as_mut().unwrap();
-                let _ = writer.write_all(&[0x01]).await;
-                let _ = writer.write_all(&ins_set.get_binary()[*lb..=*ub]).await;
+                let mut buf = Vec::with_capacity(1 + ub - lb + 1);
+                buf.push(0x01);
+                buf.extend_from_slice(&ins_set.get_binary()[*lb..=*ub]);
+                let _ = writer.write_all(&buf).await;
                 
                 // this is a little progress update
                 // event:drawing, new_ins: bytes:bytes (num/of num) time:newseconds
