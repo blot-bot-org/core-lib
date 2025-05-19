@@ -101,29 +101,46 @@ impl InstructionSet {
             let mut chunk_bounds: Vec<(usize, usize)> = vec![];
             let mut start_idx: usize = 0;
 
+            let mut current_idx = start_idx;
+            
             loop {
-                // calculate the maximum end size of the next buffer
-                let mut end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1);
-                
-                // trim the buffer down to a full instruction. must be a multiple of 5 for now, must
-                // change when additional instruction bytes are available!
-                while *self.binary.get(end_idx).unwrap() != 0x0C && end_idx > 0 || (end_idx - start_idx + 1) % 5 != 0 {
-                    end_idx -= 1;
-                }
-
-                if end_idx == 0 { // should be impossible as we've verified instructions exist already
-                    return Err(InstructionError::EmptyInstructionSet);
-                }
-
-                chunk_bounds.push((start_idx, end_idx));
-                
-                // if we've buffered all instructions, break
-                if end_idx == self.binary.len() - 1 {
+                if current_idx >= self.binary.len() - 1 {
                     break;
                 }
-                
-                // we add this to make the indexes inclusive
-                start_idx = end_idx + 1;
+
+                let max_end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1); // max end bound
+                let mut last_valid_max = current_idx; // last valid end bound
+
+                while current_idx < max_end_idx {
+                    current_idx += 4;
+
+                    if self.get_binary()[current_idx] == 0x0C {
+                        current_idx += 1;
+                    } else if self.get_binary()[current_idx] == 0x0A {
+                        current_idx += 1;
+                        if self.get_binary()[current_idx] != 0x0C {
+                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
+                        } else {
+                            current_idx += 1;
+                        }
+                    } else if self.get_binary()[current_idx] == 0x0B {
+                        current_idx += 1;
+                        if self.get_binary()[current_idx] != 0x0C {
+                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
+                        } else {
+                            current_idx += 1;
+                        }
+                    } else {
+                        return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
+                    }
+
+
+                    last_valid_max = current_idx - 1;
+                }
+
+                chunk_bounds.push((start_idx, last_valid_max));
+                start_idx = last_valid_max + 1;
+
             }
 
             Ok(chunk_bounds)
@@ -137,18 +154,51 @@ impl InstructionSet {
     /// - `instruction_set`: An instruction set
     ///
     /// # Returns:
-    /// - A vector of tuple (i16, i16) values the belts will move by, as per the provided instruction set.
+    /// - A vector of tuple (i16, i16, bool) values the belts will move by, and whether the pen is up, as per the provided instruction set.
     ///
-    pub fn parse_to_numerical_steps(&self) -> Result<Vec<(i16, i16)>, InstructionError> {
+    pub fn parse_to_numerical_steps(&self) -> Result<Vec<(i16, i16, bool)>, InstructionError> {
         let result_buffer_bounds = match self.get_buffer_bounds(512) {
             Ok(value) => value,
             Err(err) => return Err(err)
         };
 
-        let mut numerical_instructions: Vec<(i16, i16)> = vec![];
+        let mut numerical_instructions: Vec<(i16, i16, bool)> = vec![];
+        let mut pen_up = true;
+
+        for (s_idx, e_idx) in result_buffer_bounds {
+            
+            let mut c_idx = *s_idx;
+            while c_idx < *e_idx {
+                c_idx += 4;
+                if c_idx >= *e_idx { return Ok(numerical_instructions); };
+
+                let left_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 4).unwrap() as u8, *self.binary.get(c_idx - 3).unwrap() as u8]);
+                let right_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 2).unwrap() as u8, *self.binary.get(c_idx - 1).unwrap() as u8]);
+
+                let next_byte = self.get_binary()[c_idx];
+                if next_byte == 0x0C {
+                } else if next_byte == 0x0A {
+                    pen_up = true;
+                    c_idx += 1;
+                    if self.get_binary()[c_idx] != 0x0C { return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx])); }
+                } else if next_byte == 0x0B {
+                    pen_up = false;
+                    c_idx += 1;
+                    if self.get_binary()[c_idx] != 0x0C { return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx])); }
+                } else {
+                    return Err(InstructionError::IncompleteInstructions(next_byte));
+                }
+
+                numerical_instructions.push((left_steps, right_steps, pen_up));
+                c_idx += 1;
+
+            }
+
+        }
 
         // we don't have to loop through each instruction buffer to print it, but might as well for
         // safety / more accurate preview
+        /*
         for (start_idx, end_idx) in result_buffer_bounds {
             for idx in (*start_idx..=*end_idx).step_by(5) {
                 let left_steps = BigEndian::read_i16(&[*self.binary.get(idx).unwrap() as u8, *self.binary.get(idx + 1).unwrap() as u8]);
@@ -157,6 +207,7 @@ impl InstructionSet {
                 numerical_instructions.push((left_steps, right_steps));
             }
         }
+        */
         
         Ok(numerical_instructions)
     }
