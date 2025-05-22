@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use crate::drawing::DrawSurface;
 
 ///
-/// An empty struct to implement the "Links" draw method on.
+/// An empty struct to implement the "Shades" draw method on.
 ///
 pub struct ShadesMethod;
 
@@ -69,8 +69,10 @@ impl DrawMethod for ShadesMethod {
 /// A set of parameters to instruct the generation of the draw calls.
 ///
 /// # Fields:
-/// - `num_links`: The number of vertical lines to draw
-/// - `horizontal_margin`: The horizontal margin of the drawing, in millimetres
+/// - `width`: The horizontal margin of the drawing, in millimetres
+/// - `height`: The horizontal margin of the drawing, in millimetres
+/// - `num_lines`: The number of horizontal lines to draw
+/// - `power`: The tendency for the lines to converge
 ///
 #[derive(Serialize, Deserialize)]
 pub struct ShadesParameters {
