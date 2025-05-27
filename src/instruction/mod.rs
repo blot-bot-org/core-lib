@@ -170,7 +170,7 @@ impl InstructionSet {
             let mut c_idx = *s_idx;
             while c_idx < *e_idx {
                 c_idx += 4;
-                if c_idx >= *e_idx { return Ok(numerical_instructions); };
+                if c_idx >= *e_idx { break; };
 
                 let left_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 4).unwrap() as u8, *self.binary.get(c_idx - 3).unwrap() as u8]);
                 let right_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 2).unwrap() as u8, *self.binary.get(c_idx - 1).unwrap() as u8]);
@@ -193,22 +193,8 @@ impl InstructionSet {
                 c_idx += 1;
 
             }
-
         }
 
-        // we don't have to loop through each instruction buffer to print it, but might as well for
-        // safety / more accurate preview
-        /*
-        for (start_idx, end_idx) in result_buffer_bounds {
-            for idx in (*start_idx..=*end_idx).step_by(5) {
-                let left_steps = BigEndian::read_i16(&[*self.binary.get(idx).unwrap() as u8, *self.binary.get(idx + 1).unwrap() as u8]);
-                let right_steps = BigEndian::read_i16(&[*self.binary.get(idx + 2).unwrap() as u8, *self.binary.get(idx + 3).unwrap() as u8]);
-
-                numerical_instructions.push((left_steps, right_steps));
-            }
-        }
-        */
-        
         Ok(numerical_instructions)
     }
 
