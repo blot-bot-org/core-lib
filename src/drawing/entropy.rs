@@ -45,6 +45,7 @@ impl DrawMethod for EntropyMethod {
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &EntropyParameters) -> Result<(Vec<u8>, f64, f64), String> {
 
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
 
         let center_x = physical_dimensions.page_width() / 2.;
         let center_y = physical_dimensions.page_height() / 2.;

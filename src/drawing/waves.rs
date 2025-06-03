@@ -56,6 +56,7 @@ impl DrawMethod for WavesMethod {
             }
         };
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
 
         let temp_max_width = physical_dimensions.page_width() - (parameters.horizontal_margin as f64 * 2.);
         let temp_max_height = physical_dimensions.page_height() - (parameters.vertical_margin as f64 * 2.);

@@ -44,6 +44,7 @@ impl DrawMethod for LinesMethod {
     fn gen_instructions(&self, physical_dimensions: &PhysicalDimensions, parameters: &LinesParameters) -> Result<(Vec<u8>, f64, f64), String> {
         
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
         
         for i in 0..parameters.num_lines {
             for x in 0..=100 {

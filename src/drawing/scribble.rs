@@ -61,10 +61,11 @@ impl DrawMethod for ScribbleMethod {
         let max_y = stippled_points.iter().max_by_key(|p| p.y).unwrap().y.into_inner();
 
         let biggest_divisor = 1. / (parameters.width / max_x).min(parameters.height / max_y);
-
         let radius_divisor = ((100 - (parameters.scribble_size)) as f32 / 100.) * 5.;
 
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
+
         for t in tour.windows(2) {
             let scaled_x = stippled_points[t[0]].x.into_inner() / biggest_divisor;
             let scaled_y = stippled_points[t[0]].y.into_inner() / biggest_divisor;

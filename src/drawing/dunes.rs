@@ -76,6 +76,7 @@ impl DrawMethod for DunesMethod {
         }
 
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
 
         for layer_idx in 0..parameters.layers {
             // go left else go right

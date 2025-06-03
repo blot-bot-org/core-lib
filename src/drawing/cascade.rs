@@ -55,6 +55,7 @@ impl DrawMethod for CascadeMethod {
         let mut triangle_pattern: Vec<Vec<usize>> = Vec::with_capacity(parameters.boxes_horizontal);
 
         let mut surface = DrawSurface::new(physical_dimensions);
+        surface.raise_pen(false);
 
         for i in 0..parameters.boxes_horizontal {
             triangle_pattern.push(Vec::new());
