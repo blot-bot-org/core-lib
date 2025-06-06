@@ -2,7 +2,7 @@
 //! Drawing method trait, helpers and implementations
 //!
 
-use byteorder::{BigEndian, LittleEndian, ByteOrder};
+use byteorder::{BigEndian, ByteOrder};
 use crate::hardware::PhysicalDimensions;
 use serde::{Serialize, Deserialize};
 use crate::preview::belts::Belts;
@@ -19,6 +19,7 @@ pub mod dunes;
 pub mod waves;
 pub mod entropy;
 pub mod shades;
+pub mod vinyl;
 
 ///
 /// The trait for all drawing methods to implement.

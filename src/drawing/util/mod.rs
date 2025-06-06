@@ -8,3 +8,5 @@ pub mod stipple_structures;
 pub mod heightmap;
 
 pub mod dijkstra;
+
+pub mod audio;
