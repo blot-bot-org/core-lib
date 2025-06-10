@@ -76,10 +76,10 @@ impl DrawMethod for VinylMethod {
 /// A set of parameters to instruct the generation of the draw calls.
 ///
 /// # Fields:
+/// - `audio_path`: The path of the audio file
 /// - `width`: The horizontal margin of the drawing, in millimetres
 /// - `height`: The horizontal margin of the drawing, in millimetres
-/// - `num_lines`: The number of horizontal lines to draw
-/// - `power`: The tendency for the lines to converge
+/// - `num_samples`: The number of samples to take on the audio waveform
 ///
 #[derive(Serialize, Deserialize)]
 pub struct VinylParameters {
