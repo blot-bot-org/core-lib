@@ -6,7 +6,7 @@ use crate::drawing::DrawSurface;
 use super::util::audio;
 
 ///
-/// An empty struct to implement the "Shades" draw method on.
+/// An empty struct to implement the "Vinyl" draw method on.
 ///
 pub struct VinylMethod;
 
@@ -30,9 +30,10 @@ impl DrawMethod for VinylMethod {
     }
 
     ///
-    /// This drawing methods creates lines that converge into each other, within a box.
-    /// It is the first / test drawing method for the pen lifting off the page.
-    ///
+    /// Generates instructions to perform the vinyl drawing method.
+    /// This drawing method generates a visualisation of an audio file and draws the audio
+    /// waveforms on a sheet of paper.
+    /// 
     /// # Parameters:
     /// - `physical_dimensions`: A physical dimension object, including paper width / height
     /// - `parameters`: The user-configured parameters to adjust the drawing style

@@ -2,7 +2,17 @@ use std::{fs::File, path::Path};
 
 use symphonia::{core::{audio::{AudioBufferRef, Signal}, codecs::CODEC_TYPE_NULL, io::MediaSourceStream}, default::{get_codecs, get_probe}};
 
-
+/// 
+/// Creates a waveform representation using u8s, where 0 is quiet and 255 is loud.
+///
+/// # Parameters:
+/// - `file`: The file path
+/// - `sample_count`: The number of samples to return
+///
+/// # Returns:
+/// - a vector of u8s representing the waveform
+/// - a string explaining why the function failed
+///
 pub fn get_sampled_waveform(file: &str, sample_count: usize) -> Result<Vec<u8>, String> {
     
     let path = Path::new(&file);
@@ -89,6 +99,16 @@ pub fn get_sampled_waveform(file: &str, sample_count: usize) -> Result<Vec<u8>, 
     Ok(means.iter().map(|s| (s * 255.).floor() as u8).collect())
 }
 
+/// 
+/// Decodes each audio channel from any type to an f32
+///
+/// # Parameters:
+/// - `buf`: A reference to an audio buffer
+/// - `chan`: The channel number of he audio buffer
+///
+/// # Returns:
+/// - a vector of f32 values
+///
 fn samples_as_f32(buf: &AudioBufferRef, chan: usize) -> Vec<f32> {
     match buf {
         AudioBufferRef::U8(buf) => buf.chan(chan).iter().map(|s|  *s as f32).collect(),
