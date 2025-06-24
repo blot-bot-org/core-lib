@@ -48,6 +48,10 @@ impl DrawMethod for VinylMethod {
         let offset_top = (physical_dimensions.page_height() - parameters.height) / 2.;
         let sample_spacing = parameters.width / parameters.num_samples as f64;
 
+        if parameters.audio_path.is_empty() {
+            return Err(format!("Select an audio file"));
+        }
+
         let sample_heights = match audio::get_sampled_waveform(&parameters.audio_path, parameters.num_samples) {
             Ok(val) => val,
             Err(err) => {
