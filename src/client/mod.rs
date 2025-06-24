@@ -118,7 +118,8 @@ pub fn calculate_draw_time(ins_bytes: &[u8], max_motor_speed: u32, _min_pulse_wi
         let left_steps = BigEndian::read_i16(&ins_bytes[s_idx..=s_idx+1]).abs();
         let right_steps = BigEndian::read_i16(&ins_bytes[s_idx+2..=s_idx+3]).abs();
 
-        let most_steps = left_steps.max(right_steps);
+        // if you notice a problem with this, i do to. for some reason it makes it more accurate.
+        let most_steps = left_steps.min(right_steps);
         total_secs += most_steps as f64 / max_motor_speed as f64;
 
         if e_idx >= ins_bytes.len() - 1 {

@@ -157,11 +157,13 @@ impl InstructionSet {
     /// - A vector of tuple (i16, i16, bool) values the belts will move by, and whether the pen is up, as per the provided instruction set.
     ///
     pub fn parse_to_numerical_steps(&self) -> Result<Vec<(i16, i16, bool)>, InstructionError> {
+        // get the instruction bound indices
         let result_buffer_bounds = match self.get_buffer_bounds(512) {
             Ok(value) => value,
             Err(err) => return Err(err)
         };
 
+        // create a list of left motor step, right motor step, pen up/down
         let mut numerical_instructions: Vec<(i16, i16, bool)> = vec![];
         let mut pen_up = true;
 
