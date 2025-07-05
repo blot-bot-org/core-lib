@@ -104,16 +104,26 @@ impl InstructionSet {
             let mut current_idx = start_idx;
             
             loop {
+                // if we have calculated all buffer bounds, break
                 if current_idx >= self.binary.len() - 1 {
                     break;
                 }
 
+                // set current_idx to starting index
+                current_idx = start_idx;
+
+                // otherwise we'll keep the maximum end bound (e.g. current_idx + 4096)
                 let max_end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1); // max end bound
-                let mut last_valid_max = current_idx; // last valid end bound
+                let mut last_valid_max = current_idx; // last valid end bound, we'll initialise
+                // this to the current index
 
+                // while we're within the buffer bounds, keep incrementing the current_idx
                 while current_idx < max_end_idx {
+                    if(current_idx > 1) { last_valid_max = current_idx - 1; } // keep reference to last valid max here
+                    
+                    // then we "test the waters" by increment current_idx, this COULD be reset if
+                    // it goes over the max_end_idx
                     current_idx += 4;
-
                     if self.get_binary()[current_idx] == 0x0C {
                         current_idx += 1;
                     } else if self.get_binary()[current_idx] == 0x0A {
@@ -133,15 +143,14 @@ impl InstructionSet {
                     } else {
                         return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
                     }
-
-
-                    last_valid_max = current_idx - 1;
                 }
 
                 chunk_bounds.push((start_idx, last_valid_max));
+                println!("added: {} {}", start_idx, last_valid_max);
                 start_idx = last_valid_max + 1;
-
             }
+
+            println!("Buffer bounds: {:?}", chunk_bounds);
 
             Ok(chunk_bounds)
         })
