@@ -4,6 +4,8 @@
 
 pub mod error;
 
+use std::io::{self, Write};
+
 use once_cell::sync::OnceCell;
 
 use byteorder::{BigEndian, ByteOrder};
@@ -99,58 +101,56 @@ impl InstructionSet {
             }
 
             let mut chunk_bounds: Vec<(usize, usize)> = vec![];
-            let mut start_idx: usize = 0;
-
-            let mut current_idx = start_idx;
+            let mut c_idx: usize = 0; // current instruction
             
             loop {
-                // if we have calculated all buffer bounds, break
-                if current_idx >= self.binary.len() - 1 {
+                let bound_start_idx: usize = c_idx; // bound starting index
+                let mut last_valid_idx: usize = c_idx; // the last full instruction index
+                
+                while c_idx < bound_start_idx + max_chunk_size {
+                    c_idx += 4; // skip over the first 4 instruction bytes
+                    
+                    // quick check here to be safe, this does get used
+                    if c_idx >= self.get_binary().len() {
+                        break;
+                    }
+
+                    if self.get_binary()[c_idx] == 0x0C { // end of instruction command
+                    } else if self.get_binary()[c_idx] == 0x0A || self.get_binary()[c_idx] == 0x0B {
+                        c_idx += 1;
+                        if self.get_binary()[c_idx] != 0x0C { // now we expect an eoi
+                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx]));
+                        }
+                    } else { // unknown instruction
+                        return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx]));
+                    }
+
+                    // at this point, c_idx must be pointing and the eoi 0x0C
+                    // because the bounds are inclusive, we need to add this, and set c_idx as +1
+                    // for the next iter
+
+                    if c_idx >= bound_start_idx + max_chunk_size || c_idx >= self.get_binary().len() { // if the instruction is not
+                        // within bounds, add latest within bounds and break
+                        break;
+                    }
+
+                    last_valid_idx = c_idx; // otherwise set last_valid_idx as last eoi 0x0C,
+                    // bounds are inclusive as i've said
+                    c_idx += 1; // move on to the next non-0x0C command though
+                }
+
+                // push the instruction to the vector
+                chunk_bounds.push((bound_start_idx, last_valid_idx));
+                c_idx = last_valid_idx + 1; // to move onto next instruction set + 1
+
+                
+                // this one breaks the main loop, and hence allows the return
+                if c_idx >= self.get_binary().len() {
                     break;
                 }
-
-                // set current_idx to starting index
-                current_idx = start_idx;
-
-                // otherwise we'll keep the maximum end bound (e.g. current_idx + 4096)
-                let max_end_idx = (start_idx + max_chunk_size).min(self.binary.len() - 1); // max end bound
-                let mut last_valid_max = current_idx; // last valid end bound, we'll initialise
-                // this to the current index
-
-                // while we're within the buffer bounds, keep incrementing the current_idx
-                while current_idx < max_end_idx {
-                    if(current_idx > 1) { last_valid_max = current_idx - 1; } // keep reference to last valid max here
-                    
-                    // then we "test the waters" by increment current_idx, this COULD be reset if
-                    // it goes over the max_end_idx
-                    current_idx += 4;
-                    if self.get_binary()[current_idx] == 0x0C {
-                        current_idx += 1;
-                    } else if self.get_binary()[current_idx] == 0x0A {
-                        current_idx += 1;
-                        if self.get_binary()[current_idx] != 0x0C {
-                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
-                        } else {
-                            current_idx += 1;
-                        }
-                    } else if self.get_binary()[current_idx] == 0x0B {
-                        current_idx += 1;
-                        if self.get_binary()[current_idx] != 0x0C {
-                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
-                        } else {
-                            current_idx += 1;
-                        }
-                    } else {
-                        return Err(InstructionError::IncompleteInstructions(self.get_binary()[current_idx]));
-                    }
-                }
-
-                chunk_bounds.push((start_idx, last_valid_max));
-                println!("added: {} {}", start_idx, last_valid_max);
-                start_idx = last_valid_max + 1;
             }
 
-            println!("Buffer bounds: {:?}", chunk_bounds);
+            // println!("Buffer bounds: {:?}", chunk_bounds);
 
             Ok(chunk_bounds)
         })
@@ -167,7 +167,7 @@ impl InstructionSet {
     ///
     pub fn parse_to_numerical_steps(&self) -> Result<Vec<(i16, i16, bool)>, InstructionError> {
         // get the instruction bound indices
-        let result_buffer_bounds = match self.get_buffer_bounds(512) {
+        let result_buffer_bounds = match self.get_buffer_bounds(4094) {
             Ok(value) => value,
             Err(err) => return Err(err)
         };
