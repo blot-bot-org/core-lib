@@ -52,3 +52,20 @@ pub enum InstructionError {
     #[error("The configured instruction buffer size is too small {}", .0)]
     BufferTooSmall(usize),
 }
+
+
+
+///
+/// All errors emitted from the get_next_instruction function.
+///
+/// - `InstructionStreamEnded`: When the instruction stream has ended, this is called normally once
+/// - `InvalidInstruction`: When an error occured finding the next instruction
+///
+#[derive(Error, Debug)]
+pub enum NextInstructionError {
+    #[error("The instruction stream ended")]
+    EndOfStream,
+
+    #[error("The instruction was invalid at index {}", .0)]
+    InvalidInstruction(usize)
+}

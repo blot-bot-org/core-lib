@@ -11,6 +11,8 @@ use once_cell::sync::OnceCell;
 use byteorder::{BigEndian, ByteOrder};
 use error::InstructionError;
 
+use crate::instruction::error::NextInstructionError;
+
 ///
 /// An instruction set, to represent all instructions required to draw an image.
 ///
@@ -84,7 +86,7 @@ impl InstructionSet {
 
     ///
     /// Generates the index bounds of buffers to send over the socket to the drawing machine.
-    /// The bounds, say (0, 14) means send all bytes from 0 to 14 inclusive.
+    /// The bounds, say (0, 14), means send all bytes from 0 to 14 inclusive.
     ///
     /// # Parameters:
     /// - `max_chunk_size`: The maximum preferred chunk size of buffers
@@ -101,58 +103,48 @@ impl InstructionSet {
             }
 
             let mut chunk_bounds: Vec<(usize, usize)> = vec![];
-            let mut c_idx: usize = 0; // current instruction
+            let mut c_idx: usize = 0; // current instruction, should always point to the first idx
+            // of an instruction, not an 0x0c or elsewise
             
             loop {
-                let bound_start_idx: usize = c_idx; // bound starting index
-                let mut last_valid_idx: usize = c_idx; // the last full instruction index
                 
-                while c_idx < bound_start_idx + max_chunk_size {
-                    c_idx += 4; // skip over the first 4 instruction bytes
-                    
-                    // quick check here to be safe, this does get used
-                    if c_idx >= self.get_binary().len() {
-                        break;
-                    }
+                let start_idx = c_idx; // index of first byte of first ins of instruction buffer
+                let mut last_valid_idx = c_idx; // idx of last valid 0x0c byte
+                loop {
+                    match get_next_instruction_bounds(&self.binary, c_idx) {
+                        Ok((_sb, eb)) => {
+                            if eb >= start_idx + max_chunk_size { // if last byte of this ins is
+                                // out of bounds, push it and move on
+                                chunk_bounds.push((start_idx, last_valid_idx));
+                                break;
+                            }
 
-                    if self.get_binary()[c_idx] == 0x0C { // end of instruction command
-                    } else if self.get_binary()[c_idx] == 0x0A || self.get_binary()[c_idx] == 0x0B {
-                        c_idx += 1;
-                        if self.get_binary()[c_idx] != 0x0C { // now we expect an eoi
-                            return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx]));
+                            last_valid_idx = eb; // set last valid 0x0c as eb of this ins
+                            c_idx = eb + 1; // point c_idx to first byte of next ins
+                        },
+                        Err(err) => {
+                            // uncomment to print ins bounds
+                            // println!("isb {:?}", chunk_bounds);
+                            
+                            match err {
+                                NextInstructionError::EndOfStream => {
+                                    chunk_bounds.push((start_idx, last_valid_idx));
+                                    return Ok(chunk_bounds);
+                                },
+                                _ => {
+                                    return Err(InstructionError::IncompleteInstructions(self.binary[c_idx]));
+                                }
+                            }
+
                         }
-                    } else { // unknown instruction
-                        return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx]));
                     }
-
-                    // at this point, c_idx must be pointing and the eoi 0x0C
-                    // because the bounds are inclusive, we need to add this, and set c_idx as +1
-                    // for the next iter
-
-                    if c_idx >= bound_start_idx + max_chunk_size || c_idx >= self.get_binary().len() { // if the instruction is not
-                        // within bounds, add latest within bounds and break
-                        break;
-                    }
-
-                    last_valid_idx = c_idx; // otherwise set last_valid_idx as last eoi 0x0C,
-                    // bounds are inclusive as i've said
-                    c_idx += 1; // move on to the next non-0x0C command though
                 }
 
-                // push the instruction to the vector
-                chunk_bounds.push((bound_start_idx, last_valid_idx));
-                c_idx = last_valid_idx + 1; // to move onto next instruction set + 1
-
-                
-                // this one breaks the main loop, and hence allows the return
-                if c_idx >= self.get_binary().len() {
-                    break;
-                }
+                // we've just pushed an instruction buffer bound, so set the c_idx to the first
+                // byte of the next instruction
+                c_idx = last_valid_idx + 1;
             }
 
-            // println!("Buffer bounds: {:?}", chunk_bounds);
-
-            Ok(chunk_bounds)
         })
     }
 
@@ -167,7 +159,7 @@ impl InstructionSet {
     ///
     pub fn parse_to_numerical_steps(&self) -> Result<Vec<(i16, i16, bool)>, InstructionError> {
         // get the instruction bound indices
-        let result_buffer_bounds = match self.get_buffer_bounds(4094) {
+        let result_buffer_bounds = match self.get_buffer_bounds(4096) {
             Ok(value) => value,
             Err(err) => return Err(err)
         };
@@ -275,6 +267,42 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
     None
 }
 
+
+/// 
+/// Gets the indices of the next instruction, inclusive. e.g. (13, 17) could be 29-0fa-40-1a-0c
+///
+/// Parameters:
+/// - `ins_bytes`: Vector of bytes, containing raw binary instructions
+/// - `cidx`: The current starting index, the first byte of the left motor movement (always one
+/// byte after the last 0x0C eoi instruction)
+///
+/// # Returns:
+/// - a tuple of usizes, the bounds of the next instruction
+/// - An error explaining why the function failed. At the end of every stream, an EndOfStream error occurs
+///
+fn get_next_instruction_bounds(ins_bytes: &[u8], cidx: usize) -> Result<(usize, usize), NextInstructionError> {
+    
+    // so we'll skip over the motor movements, relatively 0,1,2,3 bytes
+    let mut potential_eoi_idx = cidx + 4;
+
+    if potential_eoi_idx >= ins_bytes.len() {
+        return Err(NextInstructionError::EndOfStream);
+    }
+    
+    // the next potential eoi is either an 0x0c or another custom byte such as pen up/down
+
+    // if its a pen up or down instruction, we'll assume an 0x0C afterwards so juts increment by 1
+    if ins_bytes[potential_eoi_idx] == 0x0A || ins_bytes[potential_eoi_idx] == 0x0B {
+        potential_eoi_idx += 1;
+    }
+    
+    // check if its eoi
+    if ins_bytes[potential_eoi_idx] == 0x0C {
+        return Ok((cidx, potential_eoi_idx));
+    }
+
+    return Err(NextInstructionError::InvalidInstruction(cidx));
+}
 
 
 
