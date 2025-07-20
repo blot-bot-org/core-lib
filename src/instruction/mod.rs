@@ -169,32 +169,43 @@ impl InstructionSet {
         let mut pen_up = true;
 
         for (s_idx, e_idx) in result_buffer_bounds {
-            
+
             let mut c_idx = *s_idx;
-            while c_idx < *e_idx {
-                c_idx += 4;
-                if c_idx >= *e_idx { break; };
+            loop {
+                
+                match get_next_instruction_bounds(&self.binary, c_idx) {
+                    Ok((sb, eb)) => {
+                        c_idx = eb + 1;
 
-                let left_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 4).unwrap() as u8, *self.binary.get(c_idx - 3).unwrap() as u8]);
-                let right_steps = BigEndian::read_i16(&[*self.binary.get(c_idx - 2).unwrap() as u8, *self.binary.get(c_idx - 1).unwrap() as u8]);
+                        let left_steps = BigEndian::read_i16(&[*self.binary.get(sb).unwrap() as u8, *self.binary.get(sb + 1).unwrap() as u8]);
+                        let right_steps = BigEndian::read_i16(&[*self.binary.get(sb + 2).unwrap() as u8, *self.binary.get(sb + 3).unwrap() as u8]);
 
-                let next_byte = self.get_binary()[c_idx];
-                if next_byte == 0x0C {
-                } else if next_byte == 0x0A {
-                    pen_up = true;
-                    c_idx += 1;
-                    if self.get_binary()[c_idx] != 0x0C { return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx])); }
-                } else if next_byte == 0x0B {
-                    pen_up = false;
-                    c_idx += 1;
-                    if self.get_binary()[c_idx] != 0x0C { return Err(InstructionError::IncompleteInstructions(self.get_binary()[c_idx])); }
-                } else {
-                    return Err(InstructionError::IncompleteInstructions(next_byte));
+                        if sb + 4 == eb && self.binary[sb + 4] == 0x0C { // if its only 5 bytes, hence no special instructions
+                        } else {
+
+                            if self.binary[sb + 4] == 0x0A {
+                                pen_up = true;
+                            } else if self.binary[sb + 4] == 0x0B {
+                                pen_up = false;
+                            } else {
+                                return Err(InstructionError::IncompleteInstructions(self.binary[sb + 4]));
+                            }
+                        }
+
+                        // add instruction and pen up/down
+                        numerical_instructions.push((left_steps, right_steps, pen_up));
+
+                        // if this instruction is at the end of the instruction bound, break
+                        if eb == *e_idx {
+                            break;
+                        }
+                    },
+                    Err(_err) => {
+                        // this would error if for some reason, the bounds made were longer than
+                        // the length of the self.binary. this should never happen.
+                        return Err(InstructionError::IncompleteInstructions(0xFF));
+                    }
                 }
-
-                numerical_instructions.push((left_steps, right_steps, pen_up));
-                c_idx += 1;
-
             }
         }
 
