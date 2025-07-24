@@ -61,8 +61,11 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
         if *incoming_buf.get(0).unwrap() == 0x03 {
             if !sent_move_bytes {
                 
-                let _ = safe_socket.write_all(&[0x01]);
-                let _ = safe_socket.write_all(&ins_set.get_binary());
+                let mut buf = Vec::with_capacity(1 + ins_set.get_binary().len());
+                buf.push(0x01);
+                buf.extend_from_slice(&ins_set.get_binary());
+                let _ = safe_socket.write_all(&buf);
+
                 sent_move_bytes = true;
 
             } else {
