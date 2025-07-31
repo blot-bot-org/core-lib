@@ -22,6 +22,8 @@ pub mod shades;
 pub mod vinyl;
 pub mod atom;
 
+pub mod custom;
+
 ///
 /// The trait for all drawing methods to implement.
 ///
@@ -102,7 +104,7 @@ impl<'pd> DrawSurface<'pd> {
     /// - Void if the function suceeded
     /// - An error as an owned string, explaining the problem
     ///
-    fn sample_xy(&mut self, x: f64, y: f64) -> Result<(), String> {
+    pub fn sample_xy(&mut self, x: f64, y: f64) -> Result<(), String> {
         if self.first_sample_x.is_none() || self.first_sample_y.is_none() {
             // here we basically initialise the object
             // the first sample marks the first point of the belts
@@ -174,7 +176,7 @@ impl<'pd> DrawSurface<'pd> {
     /// # Parameters:
     /// - `pen_up`: true if the pen should raise off the paper
     ///
-    fn raise_pen(&mut self, raised: bool) {
+    pub fn raise_pen(&mut self, raised: bool) {
         // if the pen is set to the state it is, the call is ignored
         if self.pen_up == raised {
             return;
@@ -217,7 +219,7 @@ impl<'pd> DrawSurface<'pd> {
     /// # Returns:
     /// - The curent (x, y) position of the pen, relative to the top corner of the paper
     /// 
-    fn get_xy(&self) -> (f64, f64) {
+    pub fn get_xy(&self) -> (f64, f64) {
         let (total_x, total_y) = self.belts.get_as_cartesian();
         (total_x - self.physical_dimensions.page_horizontal_offset(), total_y - self.physical_dimensions.page_vertical_offset())
     }
