@@ -20,6 +20,7 @@ pub mod waves;
 pub mod entropy;
 pub mod shades;
 pub mod vinyl;
+pub mod atom;
 
 ///
 /// The trait for all drawing methods to implement.
