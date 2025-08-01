@@ -291,7 +291,7 @@ fn is_stream_valid(ins_bytes: &[u8]) -> Option<InstructionError> {
 /// - a tuple of usizes, the bounds of the next instruction
 /// - An error explaining why the function failed. At the end of every stream, an EndOfStream error occurs
 ///
-fn get_next_instruction_bounds(ins_bytes: &[u8], cidx: usize) -> Result<(usize, usize), NextInstructionError> {
+pub fn get_next_instruction_bounds(ins_bytes: &[u8], cidx: usize) -> Result<(usize, usize), NextInstructionError> {
     
     // so we'll skip over the motor movements, relatively 0,1,2,3 bytes
     let mut potential_eoi_idx = cidx + 4;

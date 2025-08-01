@@ -8,6 +8,8 @@ use std::io::prelude::*;
 use error::ClientError;
 use byteorder::{ByteOrder, BigEndian};
 
+use crate::instruction::error::NextInstructionError;
+use crate::instruction::get_next_instruction_bounds;
 use crate::{drawing::DrawSurface, hardware::PhysicalDimensions, instruction::InstructionSet};
 
 pub mod state;
@@ -107,31 +109,31 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
 ///
 pub fn calculate_draw_time(ins_bytes: &[u8], max_motor_speed: u32, _min_pulse_width: u32) -> Duration {
     let mut total_secs: f64 = 0.;
-    let mut s_idx = 0;
-    let mut total_its: usize = 0;
-
+    let mut c_idx: usize = 0; // current instruction, should always point to the first idx
+    
     loop {
-        total_its += 1;
+        match get_next_instruction_bounds(&ins_bytes, c_idx) {
+            Ok((sb, eb)) => {
 
-        let mut e_idx = s_idx;
-        while ins_bytes[e_idx] != 0x0C {
-            e_idx += 1;
+                let left_steps = BigEndian::read_i16(&ins_bytes[sb..=sb+1]).abs();
+                let right_steps = BigEndian::read_i16(&ins_bytes[sb+2..=sb+3]).abs();
+                let most_steps = left_steps.max(right_steps);
+                total_secs += most_steps as f64 / max_motor_speed as f64;
+
+                c_idx = eb + 1;
+            },
+            Err(err) => {
+                match err {
+                    NextInstructionError::EndOfStream => {
+                        return Duration::from_secs_f64(total_secs);
+                    },
+                    _ => {
+                        return Duration::from_secs(0);
+                    }
+                }
+
+            }
         }
-
-        let left_steps = BigEndian::read_i16(&ins_bytes[s_idx..=s_idx+1]).abs();
-        let right_steps = BigEndian::read_i16(&ins_bytes[s_idx+2..=s_idx+3]).abs();
-
-        // if you notice a problem with this, i do to. for some reason it makes it more accurate.
-        let most_steps = left_steps.min(right_steps);
-        total_secs += most_steps as f64 / max_motor_speed as f64;
-
-        if e_idx >= ins_bytes.len() - 1 {
-            return Duration::from_secs(total_secs.round() as u64);
-        } else if total_its > ins_bytes.len() {
-            panic!("Couldn't parse the instructions for timing generation, they were invalid.");
-        }
-
-        s_idx = e_idx + 1;
     }
 }
 
