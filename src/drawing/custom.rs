@@ -81,6 +81,7 @@ impl DrawMethod for CustomMethod {
             match gen_fn.call1((surface_interface.as_ref(), param_obj.as_ref(), physical_dimensions.page_width(), physical_dimensions.page_height())) {
                 Ok(_) => {},
                 Err(err) => {
+                    println!("Error in plugin: {}", err.to_string());
                     return Err(format!("Error running `run` function in plugin: {}", err.to_string()));
                 }
             };
