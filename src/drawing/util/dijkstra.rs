@@ -1,5 +1,7 @@
 use ordered_float::OrderedFloat;
 
+// Note, atm this module is dead.
+
 /// 
 /// Creates an undirected adjacancy matrix between points.
 ///
