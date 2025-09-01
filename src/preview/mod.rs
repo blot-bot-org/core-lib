@@ -59,3 +59,26 @@ pub fn generate_preview(init_xy: (f64, f64), physical_dim: &PhysicalDimensions, 
     preview_canvas.save(path);
     None
 }
+
+///
+/// Tests relating to preview generation.
+///
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn bad_coordinates() {
+        let is = InstructionSet::new("\x7F\x7F\x7F\x7F\x0C".to_owned().into_bytes(), 0., 0.).unwrap();
+        let pd = PhysicalDimensions::new(100., 100., 100., 100., 100.);
+
+        match generate_preview((0., 0.), &pd, &is, "./") {
+            Some(_) => { 
+                panic!();
+            },
+            _ => { }
+        }
+
+    }
+}

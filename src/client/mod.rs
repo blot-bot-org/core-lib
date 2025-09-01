@@ -199,3 +199,41 @@ fn read_header(header: &[u8; 255]) -> (u16, u32, u32, u32) {
         bytes_to_u32(header, 15),
     )
 }
+
+
+///
+/// Tests relating to client helper functions.
+///
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_header() {
+        let bytes: [u8; 19] = [0x00  ,  0x00, 0x01  ,  0x00, 0x00, 0x00, 0x00  ,  0x00, 0x00, 0xFF, 0xFF  ,  0x00, 0x00, 0x10, 0x00  ,  0x00, 0x00, 0x00, 0xEA];
+        let mut full_packet = [0u8; 255];
+
+        full_packet[0..19].copy_from_slice(&bytes);
+
+        let (pv, ibs, mms, mpw) = read_header(&full_packet);
+        
+        assert_eq!(pv, 1);
+        assert_eq!(ibs, 65535);
+        assert_eq!(mms, 4096);
+        assert_eq!(mpw, 234);
+    }
+
+    #[test]
+    fn test_parse_bytes_u16() {
+        let bytes: [u8; 6] = [0x00, 0x01, 0x00, 0x00, 0x0F, 0xFF];
+
+        assert_eq!(bytes_to_u16(&bytes, 1), 256);
+    }
+
+    #[test]
+    fn test_parse_bytes_u32() {
+        let bytes: [u8; 6] = [0x00, 0x01, 0x00, 0x00, 0x0F, 0xFF];
+
+        assert_eq!(bytes_to_u32(&bytes, 1), 16777231);
+    }
+}
