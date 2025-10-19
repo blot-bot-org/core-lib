@@ -1,4 +1,3 @@
-use byteorder::ByteOrder;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::sync::Mutex;
 use tokio::net::TcpStream;

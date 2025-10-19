@@ -4,8 +4,6 @@
 
 pub mod error;
 
-use std::io::{self, Write};
-
 use once_cell::sync::OnceCell;
 
 use byteorder::{BigEndian, ByteOrder};
