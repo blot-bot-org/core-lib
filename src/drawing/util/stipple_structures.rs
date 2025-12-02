@@ -115,35 +115,25 @@ impl Triangle {
     /// # Parameters:
     /// - `test_point`: The point to be tested, whether in or out of circumcircle
     /// - `p0`: A vertex of the triangle
-    /// - `p1`: A vertex of the triangle
-    /// - `p2`: A vertex of the triangle
+    /// - `p1ps`: A vertex of the triangle, pre-anticlockwise swap
+    /// - `p2ps`: A vertex of the triangle, pre-anticlockwise swap
     ///
     /// # Returns:
     /// - A boolean, true if the point was in the circumcircle
     ///
-    pub fn point_in_circle(test_point: &Point, p0: &Point, p1: &Point, p2: &Point) -> bool {
-        let (p1x, p1y) = (p1.x - p0.x, p1.y - p0.y);
-        let (p2x, p2y) = (p2.x - p0.x, p2.y - p0.y);
-        let mut prime_d = OrderedFloat(2. * (p1x.into_inner() * p2y.into_inner() - p1y.into_inner() * p2x.into_inner()));
+    pub fn point_in_circle(tp: &Point, p0: &Point, p1ps: &Point, p2ps: &Point) -> bool {
 
-        if prime_d == 0. {
-            prime_d = OrderedFloat(1.);
-        }
-        
-        let upx = (1. / prime_d.into_inner()) * (
-            p2y.into_inner() * (p1x.powi(2) + p1y.powi(2)) - p1y.into_inner() * (p2x.powi(2) + p2y.powi(2))
-        );
-        let upy = (1. / prime_d.into_inner()) * (
-            p1x.into_inner() * (p2x.powi(2) + p2y.powi(2)) - p2x.into_inner() * (p1x.powi(2) + p1y.powi(2))
+        let is_anticlockwise = get_is_anticlockwise(*p0, *p1ps, *p2ps);
+        let p1 =  if is_anticlockwise { p1ps } else { p2ps };
+        let p2 =  if is_anticlockwise { p2ps } else { p1ps };
+
+        let mat = nalgebra::Matrix3::new(
+            (p0.x - tp.x).into_inner(), (p0.y - tp.y).into_inner(), (p0.x - tp.x).powi(2) + (p0.y - tp.y).powi(2),
+            (p1.x - tp.x).into_inner(), (p1.y - tp.y).into_inner(), (p1.x - tp.x).powi(2) + (p1.y - tp.y).powi(2),
+            (p2.x - tp.x).into_inner(), (p2.y - tp.y).into_inner(), (p2.x - tp.x).powi(2) + (p2.y - tp.y).powi(2),
         );
 
-        let ux = OrderedFloat(upx) + p0.x;
-        let uy = OrderedFloat(upy) + p0.y;
-        let radius = (upx.powi(2) + upy.powi(2)).sqrt();
-
-        let dist = ((ux - test_point.x).powi(2) + (uy - test_point.y).powi(2)).sqrt();
-
-        dist <= radius
+        mat.determinant() > 0.
     }
 
     /// 
@@ -190,4 +180,8 @@ impl Triangle {
 
         None
     }
+}
+
+fn get_is_anticlockwise(p0: Point, p1: Point, p2: Point) -> bool {
+    (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x) >= OrderedFloat::<f32>(0.)
 }
