@@ -2,6 +2,7 @@ use crate::drawing::util::stipple_structures::*;
 use image::{ImageBuffer, ImageReader};
 use rand::Rng;
 use ordered_float::OrderedFloat;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 
 
@@ -200,14 +201,15 @@ fn bowyer_watson(points: &Vec<Point>) -> Result<(Vec<[usize; 3]>, Vec<Point>), S
     // doesn't iterate super_triangle points
     for point_idx in 0..points.len() {
 
-        let mut bad_triangles: Vec<usize> = vec![]; // indices of arrays in triangle_indices
-
-        // the index of the index set in `triangle_indicies`
-        for index_set_index in 0..triangle_indices.len() {
-            if Triangle::point_in_circle(&all_points[point_idx], all_points.get(triangle_indices[index_set_index][0]).unwrap(), all_points.get(triangle_indices[index_set_index][1]).unwrap(), all_points.get(triangle_indices[index_set_index][2]).unwrap()) {
-                bad_triangles.push(index_set_index);
-            }
-        }
+        // nb: point in circle tests are expensive
+        let bad_triangles: Vec<usize> = triangle_indices.par_iter().enumerate()
+            .filter_map(|(index_set_index, triangle)| {
+                if Triangle::point_in_circle(&all_points[point_idx], all_points.get(triangle[0]).unwrap(), all_points.get(triangle[1]).unwrap(), all_points.get(triangle[2]).unwrap()) {
+                    Some(index_set_index)
+                } else {
+                    None
+                }
+            }).collect();
 
         let mut bad_edges: Vec<(usize, usize)> = vec![];
         // add the edge tuples to the vector, whilst normalising to make edge a <-> b == b <-> a
@@ -233,7 +235,6 @@ fn bowyer_watson(points: &Vec<Point>) -> Result<(Vec<[usize; 3]>, Vec<Point>), S
             }
         }
 
-        // nb: flamegraph tests show hashmap allocation is using moderate execution expense
         let mut edge_count = HashMap::new();
         for &(a, b) in bad_edges.iter() {
             *edge_count.entry((a, b)).or_insert(0) += 1;
