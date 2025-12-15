@@ -120,6 +120,7 @@ impl Triangle {
     ///
     /// # Returns:
     /// - A boolean, true if the point was in the circumcircle
+    ///
     pub fn point_in_circle(tp: &Point, p0: &Point, p1ps: &Point, p2ps: &Point) -> bool {
 
         let is_anticlockwise = get_is_anticlockwise(*p0, *p1ps, *p2ps);
