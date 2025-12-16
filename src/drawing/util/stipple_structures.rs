@@ -113,27 +113,28 @@ impl Triangle {
     /// Reference equations: https://en.wikipedia.org/wiki/Circumcircle#Cartesian_coordinates_2
     ///
     /// # Parameters:
-    /// - `test_point`: The point to be tested, whether in or out of circumcircle
     /// - `p0`: A vertex of the triangle
-    /// - `p1ps`: A vertex of the triangle, pre-anticlockwise swap
-    /// - `p2ps`: A vertex of the triangle, pre-anticlockwise swap
+    /// - `p1`: A vertex of the triangle
+    /// - `p2`: A vertex of the triangle
+    /// - `tp`: The point to be tested, whether in or out of circumcircle
     ///
     /// # Returns:
     /// - A boolean, true if the point was in the circumcircle
     ///
-    pub fn point_in_circle(tp: &Point, p0: &Point, p1ps: &Point, p2ps: &Point) -> bool {
+    pub fn point_in_circle(p0: &Point, p1: &Point, p2: &Point, tp: &Point) -> bool {
+        let ax = p0.x - tp.x;
+        let ay = p0.y - tp.y;
+        let bx = p1.x - tp.x;
+        let by = p1.y - tp.y;
+        let cx = p2.x - tp.x;
+        let cy = p2.y - tp.y;
 
-        let is_anticlockwise = get_is_anticlockwise(*p0, *p1ps, *p2ps);
-        let p1 =  if is_anticlockwise { p1ps } else { p2ps };
-        let p2 =  if is_anticlockwise { p2ps } else { p1ps };
+        let det =
+            (ax * ax + ay * ay) * (bx * cy - by * cx) +
+            (bx * bx + by * by) * (cx * ay - cy * ax) +
+            (cx * cx + cy * cy) * (ax * by - ay * bx);
 
-        let mat = nalgebra::Matrix3::new(
-            (p0.x - tp.x).into_inner(), (p0.y - tp.y).into_inner(), (p0.x - tp.x).powi(2) + (p0.y - tp.y).powi(2),
-            (p1.x - tp.x).into_inner(), (p1.y - tp.y).into_inner(), (p1.x - tp.x).powi(2) + (p1.y - tp.y).powi(2),
-            (p2.x - tp.x).into_inner(), (p2.y - tp.y).into_inner(), (p2.x - tp.x).powi(2) + (p2.y - tp.y).powi(2),
-        );
-
-        mat.determinant() > 0.
+        det.into_inner() > 0.0
     }
 
     /// 
@@ -180,8 +181,4 @@ impl Triangle {
 
         None
     }
-}
-
-fn get_is_anticlockwise(p0: Point, p1: Point, p2: Point) -> bool {
-    (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x) >= OrderedFloat::<f32>(0.)
 }

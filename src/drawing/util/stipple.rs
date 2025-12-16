@@ -2,8 +2,7 @@ use crate::drawing::util::stipple_structures::*;
 use image::{ImageBuffer, ImageReader};
 use rand::Rng;
 use ordered_float::OrderedFloat;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 
 /// 
@@ -196,69 +195,47 @@ fn bowyer_watson(points: &Vec<Point>) -> Result<(Vec<[usize; 3]>, Vec<Point>), S
     all_points.push(super_triangle[2].clone());
 
     // 3 consecutive integers are indices of all_points, which form a triangle
-    let mut triangle_indices: Vec<[usize; 3]> = vec![[super_triangle_index, super_triangle_index + 1, super_triangle_index + 2]];
+    let mut triangle_indices: Vec<[usize; 3]> = Vec::with_capacity(all_points.len() * 2); // roughly get enough space for all triangles
+    triangle_indices.push(make_anticlockwise_triangle(super_triangle_index, super_triangle_index + 1, super_triangle_index + 2, &all_points));
+
+    // assign memory outside iterator, just clear within. typically lengths wont go above around 50
+    let mut bad_edges: Vec<(usize, usize)> = Vec::with_capacity(100);
+    let mut polygon: Vec<(usize, usize)> = Vec::with_capacity(100);
 
     // doesn't iterate super_triangle points
     for point_idx in 0..points.len() {
+        bad_edges.clear();
+        polygon.clear();
 
         // nb: point in circle tests are expensive
-        let bad_triangles: Vec<usize> = triangle_indices.par_iter().enumerate()
+        let bad_triangles: Vec<usize> = triangle_indices.iter().enumerate()
             .filter_map(|(index_set_index, triangle)| {
-                if Triangle::point_in_circle(&all_points[point_idx], all_points.get(triangle[0]).unwrap(), all_points.get(triangle[1]).unwrap(), all_points.get(triangle[2]).unwrap()) {
+                if Triangle::point_in_circle(all_points.get(triangle[0]).unwrap(), all_points.get(triangle[1]).unwrap(), all_points.get(triangle[2]).unwrap(), &all_points[point_idx]) {
                     Some(index_set_index)
                 } else {
                     None
                 }
             }).collect();
 
-        let mut bad_edges: Vec<(usize, usize)> = vec![];
-        // add the edge tuples to the vector, whilst normalising to make edge a <-> b == b <-> a
-        for indice_index in bad_triangles.iter() {
-            let val = &triangle_indices[*indice_index];
 
-            if val[0] > val[1] {
-                bad_edges.push((val[0], val[1]));
-            } else {
-                bad_edges.push((val[1], val[0]));
-            }
-
-            if val[1] > val[2] {
-                bad_edges.push((val[1], val[2]));
-            } else {
-                bad_edges.push((val[2], val[1]));
-            }
-
-            if val[2] > val[0] {
-                bad_edges.push((val[2], val[0]));
-            } else {
-                bad_edges.push((val[0], val[2]));
-            }
-        }
-
+        // count edges and build polygon in one pass
         let mut edge_count = HashMap::new();
-        for &(a, b) in bad_edges.iter() {
-            *edge_count.entry((a, b)).or_insert(0) += 1;
-        }
-
-        let mut polygon: Vec<(usize, usize)> = vec![];
-        for edge in bad_edges.iter() {
-            if let Some(ec) = edge_count.get(edge) {
-                if *ec == 1 {
-                    polygon.push(*edge);
-                }
-            } else {
-                return Err("All delaunay edges should have HashMap entry.".to_owned());
+        for &tri_idx in bad_triangles.iter() {
+            let tri = &triangle_indices[tri_idx];
+            for &(a, b) in &[make_edge(tri[0], tri[1]), make_edge(tri[1], tri[2]), make_edge(tri[2], tri[0])] {
+                let count = edge_count.entry((a, b)).or_insert(0);
+                *count += 1;
             }
         }
+        polygon.extend(edge_count.iter().filter_map(|(&edge, &count)| if count == 1 { Some(edge) } else { None }));
+
 
         for bad_triangle_index in bad_triangles.iter().rev() { // reverse iterator to preverse index ordering
-            triangle_indices.remove(*bad_triangle_index);
+            triangle_indices.swap_remove(*bad_triangle_index);
         }
 
         for &(a, b) in polygon.iter() {
-            let mut new_tri = [a, b, point_idx];
-            new_tri.sort();
-            triangle_indices.push(new_tri);
+            triangle_indices.push(make_anticlockwise_triangle(a, b, point_idx, &all_points));
         }
     }
 
@@ -302,7 +279,7 @@ fn get_edge_triangles(triangles: &Vec<[usize; 3]>) -> Result<HashMap<(usize, usi
                 .and_modify(|value| {
                     if value.1 == usize::MAX { value.1 = index } else { /* println!("Edge already has two references"); */ value.1 = index; }
                 })
-                .or_insert_with(|| ((index, usize::MAX)));
+                .or_insert_with(|| (index, usize::MAX));
         }
     }
 
@@ -571,4 +548,45 @@ fn get_super_triangle(points: &[Point]) -> [Point; 3] {
     let max_y = points.iter().max_by_key(|p| p.y).unwrap().y * 2.;
 
     [ Point { x: OrderedFloat(0.), y: OrderedFloat(0.) }, Point { x: max_x, y: OrderedFloat(0.) }, Point { x: OrderedFloat(0.), y: max_y } ]
+}
+
+
+/// 
+/// Orders a list of triangle indices, ensuring geometrical vertices are anti-clockwise.
+///
+/// # Parameters:
+/// - `i0`: The first point-index of the triangle
+/// - `i1`: The second point-index of the triangle
+/// - `i2`: The third point-index of the triangle
+/// - `points`: A reference to all points in the graph
+/// 
+/// # Returns:
+/// - An array of 3 indices, referencing points in the triangle
+///
+fn make_anticlockwise_triangle(i0: usize, i1: usize, i2: usize, points: &Vec<Point>) -> [usize; 3] {
+    let pa = &points[i0];
+    let pb = &points[i1];
+    let pc = &points[i2];
+
+    let cross = (pb.x - pa.x) * (pc.y - pa.y) - (pb.y - pa.y) * (pc.x - pa.x);
+    if cross.into_inner() > 0.0 {
+        [i0, i1, i2] // anticlockwise already
+    } else {
+        [i0, i2, i1] // or swap last two points
+    }
+}
+
+/// 
+/// Creates a normalised edge.
+/// 
+/// # Parameters:
+/// - `a`: First index
+/// - `b`: First index
+///
+/// # Returns:
+/// - A normalised tuple of the indices
+///
+#[inline(always)]
+fn make_edge(a: usize, b: usize) -> (usize, usize) {
+    if a < b { (a, b) } else { (b, a) }
 }
