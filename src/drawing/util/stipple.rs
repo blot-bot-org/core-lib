@@ -581,7 +581,7 @@ fn make_anticlockwise_triangle(i0: usize, i1: usize, i2: usize, points: &Vec<Poi
 /// 
 /// # Parameters:
 /// - `a`: First index
-/// - `b`: First index
+/// - `b`: Second index
 ///
 /// # Returns:
 /// - A normalised tuple of the indices
