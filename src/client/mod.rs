@@ -94,6 +94,53 @@ pub fn move_to_start(addr: &str, port: u16, physical_dimensions: &PhysicalDimens
 }
 
 
+///
+/// Used to send a manual control request to the machine.
+///
+/// # Parameters:
+/// - `addr`: The IP address of the machine
+/// - `port`: The port address of the machine
+/// - `target_byte`: A byte specifying which aspect of the machine to control
+/// - `data`: The data to send to the machine
+///
+/// # Returns:
+/// - Void if the function completed successfully
+/// - An error, explaining why the control request failed
+///
+pub fn apply_manual_control(addr: &str, port: u16, target_byte: u8, data: i16) -> Result<(), ClientError> {
+    let socket = TcpStream::connect(format!("{}:{}", addr, port));
+    if let Err(_) = socket {
+            return Err(ClientError::MachineNotFound { addr: addr.to_owned(), port });
+        }
+    let mut safe_socket = socket.unwrap();
+    
+    let data_bytes: [u8; 2] = data.to_be_bytes(); // converts data for machine into two separate bytes
+
+    // send the appropriate data, 0x06 header is manual control
+    let _ = safe_socket.write_all(&[0x06, target_byte, data_bytes[0], data_bytes[1], 0x0C]);
+
+    let mut incoming_buf: [u8; 255] = [0; 255];
+    let _ = safe_socket.read(&mut incoming_buf);
+    
+    // its saying the machine is in use
+    if *incoming_buf.get(0).unwrap() == 0x00 {
+        return Err(ClientError::MachineInUse);
+    }
+
+    // invalid format of bytes
+    if *incoming_buf.get(0).unwrap() == 0x02 {
+        return Err(ClientError::InvalidBytes { reason: "Invalid bytes in manual control request".to_string() });
+    }
+
+    // happy byte
+    if *incoming_buf.get(0).unwrap() == 0x01 {
+        return Ok(());
+    }
+    
+    return Err(ClientError::InvalidBytes { reason: "Unknown confirmation byte".to_string() });
+}
+
+
 /// 
 /// Calculates the length, in seconds, a drawing will take.
 /// By taking the raw bytes as a parameter, you can take slices to recalculate the speed
